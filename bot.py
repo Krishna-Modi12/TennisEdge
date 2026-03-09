@@ -104,6 +104,7 @@ async def start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         f"💳 Your credits: *{db_user['credits']}*\n\n"
         f"*Commands:*\n"
         f"/signals – Latest edge signals\n"
+        f"/matches – Today's upcoming matches\n"
         f"/balance – Check your credits\n"
         f"/buy – Purchase credits\n"
         f"/help – How it works\n\n"
@@ -188,23 +189,56 @@ SURFACE_EMOJI = {"clay": "🟤", "hard": "🔵", "grass": "🟢"}
 
 @safe_handler
 async def matches_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """Show today's upcoming tennis matches with odds."""
-    await update.message.reply_text("⏳ Fetching today's matches...")
+    """Show tournament picker, then matches for selected tournament."""
+    await update.message.reply_text("⏳ Fetching today's tournaments...")
 
     from ingestion.fetch_odds import fetch_odds
-    from models.elo_model import predict
-
     matches = fetch_odds()
     if not matches:
         await update.message.reply_text("No upcoming matches found for today.")
         return
 
-    # Sort by tournament then odds
-    matches.sort(key=lambda m: (m.get("tournament", ""), m["odds_a"]))
+    # Group by tournament
+    tournaments = {}
+    for m in matches:
+        t = m.get("tournament", "Unknown")
+        tournaments.setdefault(t, []).append(m)
 
-    lines = ["🎾 *Today's Matches*\n"]
+    # Build inline keyboard — one button per tournament + "All"
+    keyboard = []
+    for t_name in sorted(tournaments.keys()):
+        count = len(tournaments[t_name])
+        surf = tournaments[t_name][0].get("surface", "hard")
+        emoji = SURFACE_EMOJI.get(surf, "⚪")
+        label = f"{emoji} {t_name} ({count})"
+        # Use short hash to keep callback_data under 64 bytes
+        callback_id = str(abs(hash(t_name)) % 100000)
+        keyboard.append([InlineKeyboardButton(label, callback_data=f"match_{callback_id}")])
+
+    keyboard.append([InlineKeyboardButton(f"🎾 All Matches ({len(matches)})", callback_data="match_all")])
+
+    # Store tournament map in bot_data so callback can look it up
+    ctx.bot_data["_match_tournaments"] = tournaments
+    ctx.bot_data["_match_callback_map"] = {
+        str(abs(hash(t)) % 100000): t for t in tournaments
+    }
+
+    await update.message.reply_text(
+        f"🎾 *Today's Tournaments* ({len(tournaments)})\n\nSelect a tournament:",
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+    )
+
+
+async def _format_matches(matches: list, title: str) -> str:
+    """Format a list of matches into a readable message."""
+    from models.elo_model import predict
+    from models.model_components import final_probability
+    from database.db import get_conn
+
+    matches.sort(key=lambda m: (m.get("tournament", ""), m["odds_a"]))
+    lines = [f"🎾 *{title}*\n"]
     current_tournament = None
-    shown = 0
 
     for m in matches:
         tourn = m.get("tournament", "Unknown")
@@ -219,35 +253,64 @@ async def matches_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         oa = m["odds_a"]
         ob = m["odds_b"]
 
-        # Get model prediction
         try:
-            pred = predict(pa, pb, m.get("surface", "hard"))
-            prob_a = pred["prob_a"]
-            prob_b = pred["prob_b"]
+            elo = predict(pa, pb, m.get("surface", "hard"))
+            with get_conn() as conn:
+                prob_a = final_probability(pa, pb, m.get("surface", "hard"), conn, elo["prob_a"])
+            try:
+                from models.calibration import calibrate
+                prob_a = calibrate(prob_a)
+            except Exception:
+                pass
+            prob_b = 1.0 - prob_a
             model_str = f"  📊 Model: {prob_a:.0%} / {prob_b:.0%}"
         except Exception:
             model_str = ""
 
         lines.append(f"  ▸ {pa} vs {pb}")
         lines.append(f"    💰 Odds: {oa:.2f} / {ob:.2f}{model_str}")
-        shown += 1
 
-    lines.append(f"\n_{shown} matches found_")
-    msg = "\n".join(lines)
+    lines.append(f"\n_{len(matches)} matches_")
+    return "\n".join(lines)
 
-    # Split if too long for Telegram (4096 char limit)
+
+async def matches_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Handle tournament selection from /matches."""
+    query = update.callback_query
+    await query.answer()
+
+    data = query.data  # "match_all" or "match_<id>"
+    tournaments = ctx.bot_data.get("_match_tournaments", {})
+    callback_map = ctx.bot_data.get("_match_callback_map", {})
+
+    if not tournaments:
+        await query.edit_message_text("⚠️ Session expired. Use /matches again.")
+        return
+
+    if data == "match_all":
+        all_matches = [m for ms in tournaments.values() for m in ms]
+        msg = await _format_matches(all_matches, "All Matches")
+    else:
+        t_id = data.replace("match_", "")
+        t_name = callback_map.get(t_id)
+        if not t_name or t_name not in tournaments:
+            await query.edit_message_text("⚠️ Tournament not found. Use /matches again.")
+            return
+        msg = await _format_matches(tournaments[t_name], t_name)
+
     if len(msg) > 4000:
+        await query.edit_message_text("Loading...")
         parts = msg.split("\n\n")
         chunk = ""
         for part in parts:
             if len(chunk) + len(part) > 3900:
-                await update.message.reply_text(chunk, parse_mode="Markdown")
+                await query.message.reply_text(chunk, parse_mode="Markdown")
                 chunk = ""
             chunk += part + "\n\n"
         if chunk.strip():
-            await update.message.reply_text(chunk, parse_mode="Markdown")
+            await query.message.reply_text(chunk, parse_mode="Markdown")
     else:
-        await update.message.reply_text(msg, parse_mode="Markdown")
+        await query.edit_message_text(msg, parse_mode="Markdown")
 
 
 # ── /help ─────────────────────────────────────────────────────────────────────
@@ -612,6 +675,7 @@ def main():
     app.add_handler(CommandHandler("updateelo",   updateelo_cmd))
     app.add_handler(CommandHandler("stats",       stats_cmd))
     app.add_handler(CallbackQueryHandler(buy_callback, pattern="^buy_"))
+    app.add_handler(CallbackQueryHandler(matches_callback, pattern="^match_"))
 
     # Pass bot reference to scheduler
     set_bot(app)

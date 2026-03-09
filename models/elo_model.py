@@ -13,7 +13,7 @@ import logging
 import math
 from config import ELO_DEFAULT_RATING, ELO_K_FACTOR, SURFACE_ELO_WEIGHT
 from database.db import get_elo, upsert_elo
-from utils import normalize_player_name
+from utils import normalize_player_name, resolve_player_name
 
 logger = logging.getLogger(__name__)
 
@@ -40,8 +40,8 @@ def predict(player_a: str, player_b: str, surface: str) -> dict:
             "elo_b":  float,
         }
     """
-    player_a = normalize_player_name(player_a)
-    player_b = normalize_player_name(player_b)
+    player_a = resolve_player_name(player_a)
+    player_b = resolve_player_name(player_b)
     elo_a = blended_rating(player_a, surface)
     elo_b = blended_rating(player_b, surface)
     prob_a = win_probability(elo_a, elo_b)

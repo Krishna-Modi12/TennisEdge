@@ -142,7 +142,7 @@ def final_probability(p1: str, p2: str, surface: str,
 
     Parameters
     ----------
-    p1, p2 : str   — player names (must match matches/h2h table format)
+    p1, p2 : str   — player names (any format — will be resolved to DB format)
     surface : str   — "hard", "clay", or "grass"
     conn : Connection — open connection to data/tennis.db
     elo_prob : float — pre-computed Surface Elo probability for p1
@@ -151,6 +151,10 @@ def final_probability(p1: str, p2: str, surface: str,
     -------
     float  — blended probability that p1 wins (0–1)
     """
+    from utils import resolve_player_name
+    p1 = resolve_player_name(p1)
+    p2 = resolve_player_name(p2)
+
     form_p1 = recent_form(p1, surface, conn)
     form_p2 = recent_form(p2, surface, conn)
     # Convert two independent form scores into a relative probability
