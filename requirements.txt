@@ -1,0 +1,8 @@
+python-telegram-bot==20.7
+requests==2.31.0
+apscheduler==3.10.4
+python-dotenv==1.0.0
+pandas>=2.0.0,<3.0.0
+openpyxl>=3.1.0
+xlrd>=1.2.0,<2.0.0
+scikit-learn>=1.0.0

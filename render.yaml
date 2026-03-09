@@ -1,0 +1,23 @@
+services:
+  - type: worker
+    name: tennisedge-bot
+    env: docker
+    region: frankfurt
+    plan: starter # A persistent disk requires a paid plan ($7/mo)
+    disk:
+      name: sqlite-data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: DATABASE_PATH
+        value: "/data/tennisedge.db"
+      - key: MOCK_MODE
+        value: "false"
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_ADMIN_ID
+        sync: false
+      - key: ODDS_API_KEY
+        sync: false
+      - key: UPI_ID
+        sync: false

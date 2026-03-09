@@ -1,0 +1,46 @@
+import os
+import logging
+from dotenv import load_dotenv
+
+load_dotenv()
+
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+
+_admin_id_raw = os.getenv("TELEGRAM_ADMIN_ID", "0")
+try:
+    TELEGRAM_ADMIN_ID = int(_admin_id_raw)
+except ValueError:
+    logging.warning(f"Invalid TELEGRAM_ADMIN_ID '{_admin_id_raw}', defaulting to 0 (no admin).")
+    TELEGRAM_ADMIN_ID = 0
+
+ODDS_API_KEY  = os.getenv("ODDS_API_KEY", "")
+ODDS_API_BASE = "https://api.the-odds-api.com/v4"
+
+# TheOddsAPI sport keys for tennis (ATP + WTA queried separately)
+TENNIS_SPORT_KEYS = ["tennis_atp", "tennis_wta"]
+
+# SQLite database file path (no server needed)
+DATABASE_PATH = os.getenv("DATABASE_PATH", os.path.join(os.path.dirname(__file__), "tennisedge.db"))
+
+UPI_ID = os.getenv("UPI_ID", "")
+
+EDGE_THRESHOLD = 0.07
+MIN_ODDS       = 1.40
+MAX_ODDS       = 6.00
+
+CREDITS_PER_SIGNAL = 1
+
+CREDIT_PACKAGES = {
+    "starter": {"credits": 10,  "price_inr": 199},
+    "pro":     {"credits": 50,  "price_inr": 799},
+    "vip":     {"credits": 200, "price_inr": 2499},
+}
+
+POLL_INTERVAL_MINUTES = 30
+
+ELO_DEFAULT_RATING = 1500.0
+ELO_K_FACTOR       = 32
+SURFACE_ELO_WEIGHT = 0.60
+
+# Set MOCK_MODE=true in .env to run without real API keys
+MOCK_MODE = os.getenv("MOCK_MODE", "true").lower() == "true"
