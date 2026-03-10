@@ -47,32 +47,55 @@ print(f"Python {sys.version}", flush=True)
 print(f"DATABASE_URL set: {bool(os.environ.get('DATABASE_URL'))}", flush=True)
 print(f"BOT_TOKEN set: {bool(os.environ.get('TELEGRAM_BOT_TOKEN'))}", flush=True)
 
-# ── Heavy imports ────────────────────────────────────────────────────────────
+# ── Heavy imports (one-by-one for diagnostics) ──────────────────────────────
 try:
-    _startup_status = "importing modules..."
+    _startup_status = "import: asyncio"
     import asyncio
+    print("  asyncio OK", flush=True)
+
+    _startup_status = "import: logging"
     import logging
+    print("  logging OK", flush=True)
+
+    _startup_status = "import: telegram"
     from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
     from telegram.ext import (
         Application, CommandHandler, CallbackQueryHandler,
         ContextTypes, MessageHandler, filters
     )
+    print("  telegram OK", flush=True)
+
+    _startup_status = "import: config"
     from config import (
         TELEGRAM_BOT_TOKEN, TELEGRAM_ADMIN_ID,
         CREDIT_PACKAGES, MOCK_MODE
     )
+    print("  config OK", flush=True)
+
+    _startup_status = "import: database.db"
     from database.db import (
         init_schema, get_or_create_user, get_user,
         add_credits_manual, get_recent_signals
     )
+    print("  database.db OK", flush=True)
+
+    _startup_status = "import: signals.formatter"
     from signals.formatter import format_signal_list
+    print("  signals.formatter OK", flush=True)
+
+    _startup_status = "import: scheduler.job"
     from scheduler.job import start_scheduler, run_pipeline, set_bot, set_loop
+    print("  scheduler.job OK", flush=True)
+
+    _startup_status = "import: models.elo_model"
     from models.elo_model import seed_top_players
+    print("  models.elo_model OK", flush=True)
+
     _startup_status = "imports OK"
     print("All imports succeeded.", flush=True)
 except Exception as e:
     tb = traceback.format_exc()
-    _startup_status = f"IMPORT ERROR:\n{tb}"
+    _startup_status = f"IMPORT ERROR at [{_startup_status}]:\n{tb}"
     print(f"IMPORT ERROR:\n{tb}", flush=True)
     while True:
         time.sleep(60)
