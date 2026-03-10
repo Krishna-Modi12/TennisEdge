@@ -416,33 +416,31 @@ async def predict_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         odds_a = m.get("odds_a", 0)
         odds_b = m.get("odds_b", 0)
         surface = m.get("surface", "hard")
+        has_odds = bool(odds_a and odds_a > 0 and odds_b and odds_b > 0)
 
         # Determine who has the edge
-        if odds_a and odds_a > 0:
+        if has_odds:
             implied_a = 1.0 / odds_a
             edge_a = prob_a - implied_a
-        else:
-            edge_a = 0
-
-        if odds_b and odds_b > 0:
             implied_b = 1.0 / odds_b
             edge_b = prob_b - implied_b
         else:
+            edge_a = 0
             edge_b = 0
 
-        # Pick the player with the larger edge for AI analysis
-        if edge_a >= edge_b:
+        # Pick the player with the larger edge (or higher prob) for AI analysis
+        if prob_a >= prob_b:
             focus_player = m["player_a"]
             focus_opponent = m["player_b"]
             focus_prob = prob_a
             focus_odds = odds_a if odds_a else 2.0
-            focus_edge = edge_a
+            focus_edge = edge_a if has_odds else 0.05
         else:
             focus_player = m["player_b"]
             focus_opponent = m["player_a"]
             focus_prob = prob_b
             focus_odds = odds_b if odds_b else 2.0
-            focus_edge = edge_b
+            focus_edge = edge_b if has_odds else 0.05
 
         # Call DeepSeek AI
         ai_text = ""
@@ -463,36 +461,43 @@ async def predict_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             )
         except Exception as e:
             logger.warning(f"AI prediction error: {e}")
-            ai_text = f"AI analysis error: {e}"
+            ai_text = f"AI error: {e}"
 
         if not ai_text:
-            ai_text = "AI analysis unavailable. Check that HF_TOKEN is set in Render environment."
+            # Distinguish between missing token and other failures
+            hf_set = bool(os.environ.get("HF_TOKEN", ""))
+            if not hf_set:
+                ai_text = "HF_TOKEN not set. Add it in Render Dashboard > Environment to enable AI."
+            else:
+                ai_text = "AI model did not return a response. The service may be temporarily busy."
 
-        # Format the response — NO Markdown to avoid crashes from player names
-        surface_emoji = {"clay": "🟤", "hard": "🔵", "grass": "🟢"}.get(surface, "🎾")
+        # Format the response
+        surface_emoji = {"clay": "\ud83d\udfe4", "hard": "\ud83d\udd35", "grass": "\ud83d\udfe2"}.get(surface, "\ud83c\udfbe")
         prob_a_pct = round(prob_a * 100, 1)
         prob_b_pct = round(prob_b * 100, 1)
-        edge_pct = round(max(edge_a, edge_b) * 100, 1)
-
-        odds_a_str = f"{odds_a:.2f}" if odds_a else "N/A"
-        odds_b_str = f"{odds_b:.2f}" if odds_b else "N/A"
 
         msg = (
-            f"🤖 DEEPSEEK AI PREDICTION\n"
-            f"━━━━━━━━━━━━━━━━━━━\n\n"
-            f"🏆 {m.get('tournament', 'Tournament')}\n"
-            f"⚔️ {m['player_a']} vs {m['player_b']}\n"
+            f"\ud83e\udd16 DEEPSEEK AI PREDICTION\n"
+            f"\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\n"
+            f"\ud83c\udfc6 {m.get('tournament', 'Tournament')}\n"
+            f"\u2694\ufe0f {m['player_a']} vs {m['player_b']}\n"
             f"{surface_emoji} Surface: {surface.title()}\n\n"
-            f"📊 Model Probabilities:\n"
+            f"\ud83d\udcca Model Probabilities:\n"
             f"  {m['player_a']}: {prob_a_pct}%\n"
             f"  {m['player_b']}: {prob_b_pct}%\n\n"
-            f"💰 Odds:\n"
-            f"  {m['player_a']}: {odds_a_str}\n"
-            f"  {m['player_b']}: {odds_b_str}\n\n"
         )
 
-        if edge_pct > 0:
-            msg += f"💎 Best Edge: {focus_player} +{edge_pct}%\n\n"
+        if has_odds:
+            msg += (
+                f"\ud83d\udcb0 Odds:\n"
+                f"  {m['player_a']}: {odds_a:.2f}\n"
+                f"  {m['player_b']}: {odds_b:.2f}\n\n"
+            )
+            edge_pct = round(max(edge_a, edge_b) * 100, 1)
+            if edge_pct > 0:
+                msg += f"\ud83d\udc8e Best Edge: {focus_player} +{edge_pct}%\n\n"
+        else:
+            msg += "\ud83d\udcb0 Odds: Not yet available for this match\n\n"
 
         # Add model breakdown if available
         if data_quality != "elo_only" and result:
@@ -501,21 +506,22 @@ async def predict_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             surf_p = round(result.get("surface_prob_a", 0.5) * 100, 1)
             h2h_p = round(result.get("h2h_prob_a", 0.5) * 100, 1)
             msg += (
-                f"📐 Model Breakdown:\n"
+                f"\ud83d\udcd0 Model Breakdown:\n"
                 f"  Elo (40%): {elo_p}%\n"
                 f"  Form (25%): {form_p}%\n"
                 f"  Surface (20%): {surf_p}%\n"
                 f"  H2H (15%): {h2h_p}%\n\n"
             )
+        elif prob_a == 0.5 and prob_b == 0.5:
+            msg += "\u26a0\ufe0f Players not in database \u2014 model defaulted to 50/50\n\n"
 
         msg += (
-            f"🤖 AI Analysis:\n"
+            f"\ud83e\udd16 AI Analysis:\n"
             f"{ai_text}\n\n"
-            f"━━━━━━━━━━━━━━━━━━━\n"
+            f"\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n"
             f"Powered by DeepSeek AI via HuggingFace"
         )
 
-        # Telegram has a 4096 char limit
         if len(msg) > 4000:
             msg = msg[:3950] + "\n\n...truncated"
 
