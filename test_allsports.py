@@ -1,8 +1,9 @@
 import requests
 import json
 from datetime import date, timedelta
+from config import ODDS_API_KEY
 
-API_KEY = "3c9d66e88c5a6fbe2a9632b838710ce51c8838ccb734ad188bb6639ff2b02836"
+API_KEY = ODDS_API_KEY
 BASE_URL = "https://apiv2.allsportsapi.com/tennis/"
 
 today = date.today()

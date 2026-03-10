@@ -19,6 +19,26 @@ def odds_to_prob(odds: float) -> float:
     return round(1.0 / odds, 4)
 
 
+# Acceptable overround range for a two-way market (sum of implied probs).
+# Values outside [MIN_OVERROUND, MAX_OVERROUND] indicate bad/stale odds data.
+MIN_OVERROUND = 0.95
+MAX_OVERROUND = 1.30
+
+
+def is_valid_odds(odds_a: float, odds_b: float) -> bool:
+    """
+    Validate that a two-way odds pair is realistic.
+
+    The overround (sum of implied probabilities) should be between
+    MIN_OVERROUND and MAX_OVERROUND. Values outside this range suggest
+    corrupted, stale, or placeholder odds data.
+    """
+    if odds_a <= 0 or odds_b <= 0:
+        return False
+    overround = odds_to_prob(odds_a) + odds_to_prob(odds_b)
+    return MIN_OVERROUND <= overround <= MAX_OVERROUND
+
+
 def detect_edges(matches: list) -> list:
     """
     Given a list of matches with odds, run the Elo model and detect value bets.
@@ -42,6 +62,15 @@ def detect_edges(matches: list) -> list:
 
         # Skip extreme odds
         if not (MIN_ODDS <= odds_a <= MAX_ODDS) and not (MIN_ODDS <= odds_b <= MAX_ODDS):
+            continue
+
+        # Skip matches with unrealistic odds (bad/stale data)
+        if not is_valid_odds(odds_a, odds_b):
+            logger.debug(
+                "[EdgeDetector] Skipping %s — overround out of range (%.3f)",
+                match_id,
+                odds_to_prob(odds_a) + odds_to_prob(odds_b),
+            )
             continue
 
         # Model probability

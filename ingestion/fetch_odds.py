@@ -5,6 +5,7 @@ Falls back to mock data when MOCK_MODE=true.
 """
 
 import logging
+import re
 import time
 import requests
 from datetime import date, timedelta
@@ -50,10 +51,18 @@ TOURNAMENT_SURFACE_MAP = {
 }
 
 def infer_surface(tournament: str) -> str:
-    """Infer court surface from tournament name. Falls back to 'hard'."""
+    """Infer court surface from tournament name. Falls back to 'hard'.
+
+    Uses word-boundary matching to avoid false positives where a keyword
+    appears as a substring of an unrelated word (e.g. "halle" inside
+    "challenger").
+    """
     name = tournament.lower()
     for keyword, surface in TOURNAMENT_SURFACE_MAP.items():
-        if keyword in name:
+        # Build a pattern that requires the keyword to be surrounded by
+        # non-alpha characters (start/end of string, space, punctuation).
+        pattern = r'(?<![a-z])' + re.escape(keyword) + r'(?![a-z])'
+        if re.search(pattern, name):
             return surface
     return "hard"
 
