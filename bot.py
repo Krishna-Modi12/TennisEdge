@@ -253,21 +253,28 @@ async def error_handler(update: object, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
 def main():
     import traceback
-    import sys
+    global _startup_status
 
     # Start health check HTTP server for Render
     _start_health_server()
 
     try:
+        _startup_status = "connecting to database..."
         print("Connecting to database...", flush=True)
         init_schema()
+        _startup_status = "database ready, seeding elo..."
         print("Database schema ready.", flush=True)
         seed_top_players()
+        _startup_status = "elo done, building bot..."
         print("Elo seeding done.", flush=True)
-    except Exception:
-        traceback.print_exc()
-        print("FATAL: Database initialization failed. Exiting.", flush=True)
-        sys.exit(1)
+    except Exception as e:
+        tb = traceback.format_exc()
+        _startup_status = f"FATAL: {tb}"
+        print(f"FATAL: Database initialization failed:\n{tb}", flush=True)
+        # Keep process alive so health check stays accessible for debugging
+        import time
+        while True:
+            time.sleep(60)
 
     if MOCK_MODE:
         print("⚠️  MOCK_MODE=true — using fake match data.")
@@ -302,7 +309,8 @@ def main():
     set_bot(app)
     start_scheduler()
 
-    print("🎾 TennisEdge bot is running...")
+    _startup_status = "running"
+    print("🎾 TennisEdge bot is running...", flush=True)
     app.run_polling(drop_pending_updates=True)
 
 
@@ -312,11 +320,14 @@ if __name__ == "__main__":
 
 # ── Health-check HTTP server (keeps Render web service alive) ────────────────
 
+_startup_status = "starting"
+
+
 class _HealthHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.end_headers()
-        self.wfile.write(b"OK")
+        self.wfile.write(_startup_status.encode())
 
     def log_message(self, *args):
         pass  # suppress request logs
