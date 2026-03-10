@@ -91,6 +91,10 @@ try:
     from models.elo_model import seed_top_players
     print("  models.elo_model OK", flush=True)
 
+    _startup_status = "import: ingestion.fetch_odds"
+    from ingestion.fetch_odds import fetch_odds
+    print("  ingestion.fetch_odds OK", flush=True)
+
     _startup_status = "imports OK"
     print("All imports succeeded.", flush=True)
 except Exception as e:
@@ -136,6 +140,7 @@ async def start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         f"💳 Your credits: *{db_user['credits']}*\n\n"
         f"*Commands:*\n"
         f"/signals \\– Latest edge signals\n"
+        f"/matches \\– Upcoming matches & odds\n"
         f"/balance \\– Check your credits\n"
         f"/buy \\– Purchase credits\n"
         f"/help \\– How it works\n\n"
@@ -215,6 +220,33 @@ async def signals(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(msg, parse_mode="Markdown")
 
 
+# ── /matches ─────────────────────────────────────────────────────────────────
+
+async def matches(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("⏳ Fetching live matches...")
+    try:
+        match_list = fetch_odds()
+    except Exception as e:
+        await update.message.reply_text(f"❌ Failed to fetch matches: {e}")
+        return
+
+    if not match_list:
+        await update.message.reply_text("📭 No upcoming matches found right now. Check back later!")
+        return
+
+    lines = ["🎾 *Upcoming Matches*\n"]
+    for i, m in enumerate(match_list[:10], 1):
+        lines.append(
+            f"{i}. *{m['player_a']}* vs *{m['player_b']}*\n"
+            f"   🏟 {m['tournament']}  |  🌍 {m['surface'].title()}\n"
+            f"   📊 Odds: {m['odds_a']:.2f} / {m['odds_b']:.2f}\n"
+        )
+    if len(match_list) > 10:
+        lines.append(f"\n_...and {len(match_list) - 10} more matches_")
+
+    await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
+
+
 # ── /help ─────────────────────────────────────────────────────────────────────
 
 async def help_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -236,6 +268,7 @@ async def help_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         "/start – Register\n"
         "/balance – Check credits\n"
         "/signals – Latest signals\n"
+        "/matches – Upcoming matches & odds\n"
         "/buy – Purchase credits",
         parse_mode="Markdown"
     )
@@ -358,6 +391,7 @@ def main():
     app.add_handler(CommandHandler("balance",    balance))
     app.add_handler(CommandHandler("buy",        buy))
     app.add_handler(CommandHandler("signals",    signals))
+    app.add_handler(CommandHandler("matches",    matches))
     app.add_handler(CommandHandler("help",       help_cmd))
     # Admin commands
     app.add_handler(CommandHandler("scan",       scan))
