@@ -245,38 +245,45 @@ async def matches(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("📭 No upcoming matches found right now. Check back later!")
         return
 
-    # Also run edge detection so we can show which matches have edges
     try:
-        from signals.edge_detector import detect_edges, odds_to_prob
+        from signals.edge_detector import odds_to_prob
         from models.elo_model import predict
         from config import EDGE_THRESHOLD
     except ImportError:
         pass
 
     lines = ["🎾 *Upcoming Matches*\n"]
-    for i, m in enumerate(match_list[:10], 1):
+    for i, m in enumerate(match_list[:15], 1):
         edge_text = ""
-        try:
-            model = predict(m["player_a"], m["player_b"], m.get("surface", "hard"))
-            market_a = odds_to_prob(m["odds_a"])
-            market_b = odds_to_prob(m["odds_b"])
-            edge_a = model["prob_a"] - market_a
-            edge_b = model["prob_b"] - market_b
-            if edge_a >= EDGE_THRESHOLD:
-                edge_text = f"   🔥 Edge: {m['player_a']} +{edge_a:.1%}\n"
-            elif edge_b >= EDGE_THRESHOLD:
-                edge_text = f"   🔥 Edge: {m['player_b']} +{edge_b:.1%}\n"
-        except Exception:
-            pass
+        odds_text = ""
+        if m.get("odds_a") and m.get("odds_b") and m["odds_a"] > 0 and m["odds_b"] > 0:
+            odds_text = f"   📊 Odds: {m['odds_a']:.2f} / {m['odds_b']:.2f}\n"
+            try:
+                model = predict(m["player_a"], m["player_b"], m.get("surface", "hard"))
+                market_a = odds_to_prob(m["odds_a"])
+                market_b = odds_to_prob(m["odds_b"])
+                edge_a = model["prob_a"] - market_a
+                edge_b = model["prob_b"] - market_b
+                if edge_a >= EDGE_THRESHOLD:
+                    edge_text = f"   🔥 Edge: {m['player_a']} +{edge_a:.1%}\n"
+                elif edge_b >= EDGE_THRESHOLD:
+                    edge_text = f"   🔥 Edge: {m['player_b']} +{edge_b:.1%}\n"
+            except Exception:
+                pass
+
+        time_str = m.get("event_time", "")
+        status = m.get("status", "")
+        status_text = f"🔴 {status}" if status and status != "Finished" else f"🕐 {time_str}" if time_str else ""
 
         lines.append(
             f"{i}. *{m['player_a']}* vs *{m['player_b']}*\n"
             f"   🏟 {m['tournament']}  |  🌍 {m['surface'].title()}\n"
-            f"   📊 Odds: {m['odds_a']:.2f} / {m['odds_b']:.2f}\n"
+            f"   {status_text}\n"
+            f"{odds_text}"
             f"{edge_text}"
         )
-    if len(match_list) > 10:
-        lines.append(f"\n_...and {len(match_list) - 10} more matches_")
+    if len(match_list) > 15:
+        lines.append(f"\n_...and {len(match_list) - 15} more matches_")
 
     await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
 

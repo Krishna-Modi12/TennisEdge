@@ -1,20 +1,16 @@
 """
 ingestion/fetch_odds.py
-Fetches live tennis odds from TheOddsAPI.
-Falls back to mock data when MOCK_MODE=true.
+Fetches live tennis fixtures and odds from AllSportsAPI.
+Falls back to mock data when MOCK_MODE=true or API fails.
 """
 
+import datetime
 import requests
-from config import ODDS_API_KEY, ODDS_API_BASE, MOCK_MODE
+from config import ODDS_API_KEY, MOCK_MODE
 
-# BUG FIX: "tennis" is not a valid TheOddsAPI sport key.
-# Real keys are "tennis_atp" and "tennis_wta". Using "tennis" returns a 404
-# and silently falls through to an empty list every single run.
-TENNIS_SPORT_KEYS = ["tennis_atp", "tennis_wta"]
+ALLSPORTS_BASE = "https://apiv2.allsportsapi.com/tennis/"
 
-# BUG FIX: TheOddsAPI does not return surface in its response.
-# Without this map everything defaults to "hard", meaning clay/grass
-# tournaments get the wrong Elo blend and produce inaccurate edges.
+# Surface lookup by tournament name keyword
 TOURNAMENT_SURFACE_MAP = {
     # Grand Slams
     "australian open":    "hard",
@@ -24,9 +20,9 @@ TOURNAMENT_SURFACE_MAP = {
     "us open":            "hard",
     # Masters / WTA 1000
     "indian wells":       "hard",
-    "miami open":         "hard",
+    "miami":              "hard",
     "monte carlo":        "clay",
-    "madrid open":        "clay",
+    "madrid":             "clay",
     "italian open":       "clay",
     "rome":               "clay",
     "canada":             "hard",
@@ -53,34 +49,27 @@ TOURNAMENT_SURFACE_MAP = {
     "nottingham":         "grass",
     "charleston":         "clay",
     "stuttgart":          "clay",
-    "rome":               "clay",
     "dubai":              "hard",
     "doha":               "hard",
-    "miami":              "hard",
+    # Challengers
+    "cherbourg":          "hard",
+    "kolkata":            "hard",
+    "heraklion":          "clay",
 }
 
 
 def _surface_from_tournament(tournament_name: str) -> str:
-    """Look up surface by tournament name substring match."""
     name_lower = tournament_name.lower()
     for keyword, surface in TOURNAMENT_SURFACE_MAP.items():
         if keyword in name_lower:
             return surface
-    return "hard"  # safe default
+    return "hard"
 
 
 def fetch_odds() -> list:
     """
-    Returns list of match dicts:
-    {
-        "match_id":   str,
-        "player_a":   str,
-        "player_b":   str,
-        "tournament": str,
-        "surface":    str,
-        "odds_a":     float,
-        "odds_b":     float,
-    }
+    Returns list of match dicts with odds from AllSportsAPI.
+    Falls back to mock data if MOCK_MODE or API fails.
     """
     if MOCK_MODE or not ODDS_API_KEY:
         return _mock_odds()
@@ -92,71 +81,115 @@ def fetch_odds() -> list:
 
 
 def _live_odds() -> list:
-    all_matches = []
-    for sport_key in TENNIS_SPORT_KEYS:
-        url = f"{ODDS_API_BASE}/sports/{sport_key}/odds"
-        params = {
-            "apiKey":     ODDS_API_KEY,
-            "regions":    "uk,eu",
-            "markets":    "h2h",
-            "oddsFormat": "decimal",
-        }
-        try:
-            resp = requests.get(url, params=params, timeout=15)
-            resp.raise_for_status()
-            events = resp.json()
-        except Exception as e:
-            print(f"[fetch_odds] API error for {sport_key}: {e}")
+    today = datetime.date.today()
+    tomorrow = today + datetime.timedelta(days=1)
+    date_from = today.strftime("%Y-%m-%d")
+    date_to = tomorrow.strftime("%Y-%m-%d")
+
+    # Step 1: Fetch fixtures (today + tomorrow)
+    fixtures = _fetch_fixtures(date_from, date_to)
+    if not fixtures:
+        return []
+
+    # Filter: singles only, upcoming (not finished), ATP/WTA/Challenger
+    upcoming = []
+    for f in fixtures:
+        country = f.get("country_name", "")
+        if "Doubles" in country:
             continue
+        status = f.get("event_status", "")
+        if status == "Finished" or status == "Cancelled":
+            continue
+        upcoming.append(f)
 
-        for event in events:
-            match = _parse_event(event)
-            if match:
-                all_matches.append(match)
+    if not upcoming:
+        print("[fetch_odds] No upcoming singles fixtures found.")
+        return []
 
-    print(f"[fetch_odds] Fetched {len(all_matches)} matches with odds.")
-    return all_matches
+    # Step 2: Fetch odds for today+tomorrow
+    odds_map = _fetch_odds_map(date_from, date_to)
 
-
-def _parse_event(event: dict) -> dict:
-    try:
-        player_a   = event["home_team"]
-        player_b   = event["away_team"]
-        match_id   = event["id"]
-        tournament = event.get("sport_title", "ATP/WTA")
-
-        best_a = None
-        best_b = None
-
-        for bookmaker in event.get("bookmakers", []):
-            for market in bookmaker.get("markets", []):
-                if market["key"] != "h2h":
-                    continue
-                for outcome in market["outcomes"]:
-                    if outcome["name"] == player_a:
-                        if best_a is None or outcome["price"] > best_a:
-                            best_a = outcome["price"]
-                    elif outcome["name"] == player_b:
-                        if best_b is None or outcome["price"] > best_b:
-                            best_b = outcome["price"]
-
-        if not best_a or not best_b:
-            return None
-
+    # Step 3: Combine fixtures + odds
+    all_matches = []
+    for f in upcoming:
+        event_key = str(f["event_key"])
+        player_a = f.get("event_first_player", "Unknown")
+        player_b = f.get("event_second_player", "Unknown")
+        tournament = f.get("league_name", "Unknown")
         surface = _surface_from_tournament(tournament)
+        event_time = f.get("event_time", "")
+        event_date = f.get("event_date", "")
 
-        return {
-            "match_id":   match_id,
+        odds_a = None
+        odds_b = None
+
+        if event_key in odds_map:
+            ha = odds_map[event_key].get("Home/Away", {})
+            home_odds = ha.get("Home", {})
+            away_odds = ha.get("Away", {})
+            # Pick best (highest) odds across bookmakers
+            if home_odds:
+                odds_a = max(float(v) for v in home_odds.values())
+            if away_odds:
+                odds_b = max(float(v) for v in away_odds.values())
+
+        # If no odds available, use placeholder
+        if not odds_a or not odds_b:
+            odds_a = odds_a or 0.0
+            odds_b = odds_b or 0.0
+
+        all_matches.append({
+            "match_id":   event_key,
             "player_a":   player_a,
             "player_b":   player_b,
             "tournament": tournament,
             "surface":    surface,
-            "odds_a":     round(best_a, 2),
-            "odds_b":     round(best_b, 2),
-        }
+            "odds_a":     round(odds_a, 2),
+            "odds_b":     round(odds_b, 2),
+            "event_date": event_date,
+            "event_time": event_time,
+            "status":     f.get("event_status", ""),
+        })
+
+    print(f"[fetch_odds] Fetched {len(all_matches)} upcoming matches.")
+    return all_matches
+
+
+def _fetch_fixtures(date_from: str, date_to: str) -> list:
+    try:
+        resp = requests.get(ALLSPORTS_BASE, params={
+            "met": "Fixtures",
+            "APIkey": ODDS_API_KEY,
+            "from": date_from,
+            "to": date_to,
+        }, timeout=15)
+        resp.raise_for_status()
+        data = resp.json()
+        if data.get("success") == 1:
+            return data.get("result", [])
+        print(f"[fetch_odds] Fixtures API error: {data}")
+        return []
     except Exception as e:
-        print(f"[fetch_odds] Parse error: {e}")
-        return None
+        print(f"[fetch_odds] Fixtures request failed: {e}")
+        return []
+
+
+def _fetch_odds_map(date_from: str, date_to: str) -> dict:
+    try:
+        resp = requests.get(ALLSPORTS_BASE, params={
+            "met": "Odds",
+            "APIkey": ODDS_API_KEY,
+            "from": date_from,
+            "to": date_to,
+        }, timeout=15)
+        resp.raise_for_status()
+        data = resp.json()
+        if data.get("success") == 1:
+            return data.get("result", {})
+        return {}
+    except Exception as e:
+        print(f"[fetch_odds] Odds request failed: {e}")
+        return {}
 
 
 def _mock_odds() -> list:
