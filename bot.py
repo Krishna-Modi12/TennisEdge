@@ -363,7 +363,10 @@ async def predict(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     # Build buttons — show up to 20 matches
     buttons = []
     for i, m in enumerate(match_list[:20]):
-        label = f"🎾 {m['player_a']} vs {m['player_b']}"
+        # Truncate label to avoid Telegram callback_data 64-byte limit
+        pa = m['player_a'][:15]
+        pb = m['player_b'][:15]
+        label = f"🎾 {pa} vs {pb}"
         buttons.append([InlineKeyboardButton(label, callback_data=f"pred_{i}")])
 
     await update.message.reply_text(
@@ -377,11 +380,6 @@ async def predict(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 async def predict_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     """Handle match selection — run DeepSeek prediction."""
-    # Constants for AI API call
-    MODEL = "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B:fastest"
-    HF_BASE_URL = "https://router.huggingface.co/v1"
-    TIMEOUT_SECONDS = 30
-
     query = update.callback_query
     await query.answer()
 
@@ -659,13 +657,19 @@ async def error_handler(update: object, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     Now errors are logged and the user gets a friendly message.
     """
     logger.error("Unhandled exception in handler:", exc_info=ctx.error)
-    if isinstance(update, Update) and update.message:
-        try:
-            await update.message.reply_text(
-                "⚠️ Something went wrong. Please try again in a moment."
-            )
-        except Exception:
-            pass
+    # Try to notify the user regardless of update type
+    try:
+        if isinstance(update, Update):
+            if update.callback_query:
+                await update.callback_query.edit_message_text(
+                    "⚠️ Something went wrong. Please try again."
+                )
+            elif update.message:
+                await update.message.reply_text(
+                    "⚠️ Something went wrong. Please try again in a moment."
+                )
+    except Exception:
+        pass
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────

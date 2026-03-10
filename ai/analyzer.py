@@ -22,21 +22,31 @@ TIMEOUT_SECONDS = 30
 MAX_TOKENS = 150
 
 
-@lru_cache(maxsize=1)
+_client_cache = None  # None = not initialized, False = no token/failed
+
+
 def _get_client():
     """Lazy-init the OpenAI client. Returns None if HF_TOKEN not set."""
+    global _client_cache
+    if _client_cache is not None:
+        return _client_cache if _client_cache else None
+
     token = os.environ.get("HF_TOKEN", "")
     if not token:
         logger.info("[AI] HF_TOKEN not set — AI analysis disabled.")
+        _client_cache = False
         return None
     try:
         from openai import OpenAI
-        return OpenAI(base_url=HF_BASE_URL, api_key=token)
+        _client_cache = OpenAI(base_url=HF_BASE_URL, api_key=token)
+        return _client_cache
     except ImportError:
         logger.warning("[AI] openai package not installed — AI analysis disabled.")
+        _client_cache = False
         return None
     except Exception as e:
         logger.warning(f"[AI] Failed to init client: {e}")
+        _client_cache = False
         return None
 
 
@@ -68,7 +78,7 @@ def _build_prompt(player: str, opponent: str, surface: str,
         f"why this bet has value. Be specific and confident.\n\n"
         f"Match: {player} vs {opponent} on {surface}\n"
         f"Our model gives {player} a {prob_pct}% win probability.\n"
-        f"Bookmaker odds: {odds} (implied {round(100/odds, 1)}%)\n"
+        f"Bookmaker odds: {odds} (implied {round(100/odds, 1) if odds > 0 else 'N/A'}%)\n"
         f"Value edge: +{edge_pct}%{breakdown}\n\n"
         f"Write a brief, punchy rationale (1-2 sentences only, no intro phrases):"
     )
