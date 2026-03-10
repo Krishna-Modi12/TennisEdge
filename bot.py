@@ -141,6 +141,7 @@ async def start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         f"*Commands:*\n"
         f"/signals \\– Latest edge signals\n"
         f"/matches \\– Upcoming matches & odds\n"
+        f"/predict \\– 🤖 AI match predictions\n"
         f"/balance \\– Check your credits\n"
         f"/buy \\– Purchase credits\n"
         f"/help \\– How it works\n\n"
@@ -341,6 +342,184 @@ async def tournament_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await query.edit_message_text(text, parse_mode="Markdown")
 
 
+# ── /predict ──────────────────────────────────────────────────────────────────
+
+async def predict(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Interactive AI prediction: show upcoming matches as buttons."""
+    await update.message.reply_text("🤖 Fetching matches for AI prediction...")
+    try:
+        match_list = fetch_odds()
+    except Exception as e:
+        await update.message.reply_text(f"❌ Failed to fetch matches: {e}")
+        return
+
+    if not match_list:
+        await update.message.reply_text("📭 No upcoming matches found right now. Try again later!")
+        return
+
+    # Store matches for callback lookup
+    ctx.user_data["predict_matches"] = match_list
+
+    # Build buttons — show up to 20 matches
+    buttons = []
+    for i, m in enumerate(match_list[:20]):
+        label = f"🎾 {m['player_a']} vs {m['player_b']}"
+        buttons.append([InlineKeyboardButton(label, callback_data=f"pred_{i}")])
+
+    await update.message.reply_text(
+        f"🤖 *Select a Match for AI Prediction*\n\n"
+        f"Found *{len(match_list)}* upcoming matches.\n"
+        f"Tap a match below to get a DeepSeek AI analysis:\n",
+        reply_markup=InlineKeyboardMarkup(buttons),
+        parse_mode="Markdown",
+    )
+
+
+async def predict_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Handle match selection — run DeepSeek prediction."""
+    query = update.callback_query
+    await query.answer()
+
+    idx = int(query.data.split("_")[1])
+    match_list = ctx.user_data.get("predict_matches", [])
+
+    if idx >= len(match_list):
+        await query.edit_message_text("❌ Match not found. Try /predict again.")
+        return
+
+    m = match_list[idx]
+    await query.edit_message_text(
+        f"🤖 *Analyzing...*\n\n"
+        f"⚔️ {m['player_a']} vs {m['player_b']}\n"
+        f"🏟 {m.get('tournament', 'Unknown')}\n\n"
+        f"_Running DeepSeek AI model... please wait 10-15 seconds._",
+        parse_mode="Markdown",
+    )
+
+    # Get model prediction
+    try:
+        from models.advanced_model import advanced_predict as model_predict
+        result = model_predict(m["player_a"], m["player_b"], m.get("surface", "hard"))
+        prob_a = result["prob_a"]
+        prob_b = result["prob_b"]
+        data_quality = result.get("data_quality", "unknown")
+    except Exception:
+        prob_a = 0.5
+        prob_b = 0.5
+        data_quality = "elo_only"
+        result = {}
+
+    odds_a = m.get("odds_a", 0)
+    odds_b = m.get("odds_b", 0)
+    surface = m.get("surface", "hard")
+
+    # Determine who has the edge
+    if odds_a and odds_a > 0:
+        implied_a = 1.0 / odds_a
+        edge_a = prob_a - implied_a
+    else:
+        edge_a = 0
+        implied_a = 0.5
+
+    if odds_b and odds_b > 0:
+        implied_b = 1.0 / odds_b
+        edge_b = prob_b - implied_b
+    else:
+        edge_b = 0
+        implied_b = 0.5
+
+    # Pick the player with the larger edge for AI analysis
+    if edge_a >= edge_b:
+        focus_player = m["player_a"]
+        focus_opponent = m["player_b"]
+        focus_prob = prob_a
+        focus_odds = odds_a if odds_a else 2.0
+        focus_edge = edge_a
+    else:
+        focus_player = m["player_b"]
+        focus_opponent = m["player_a"]
+        focus_prob = prob_b
+        focus_odds = odds_b if odds_b else 2.0
+        focus_edge = edge_b
+
+    # Call DeepSeek AI
+    ai_text = ""
+    try:
+        from ai.analyzer import generate_match_analysis
+        ai_text = await generate_match_analysis(
+            player=focus_player,
+            opponent=focus_opponent,
+            surface=surface,
+            model_prob=focus_prob,
+            odds=focus_odds,
+            value_edge=focus_edge,
+            data_quality=data_quality,
+            elo_prob=result.get("elo_prob_a"),
+            form_prob=result.get("form_prob_a"),
+            surface_prob=result.get("surface_prob_a"),
+            h2h_prob=result.get("h2h_prob_a"),
+        )
+    except Exception as e:
+        logger.warning(f"AI prediction error: {e}")
+        ai_text = "AI analysis unavailable at this time."
+
+    if not ai_text:
+        ai_text = "AI analysis unavailable — check HF_TOKEN configuration."
+
+    # Format the response
+    surface_emoji = {"clay": "🟤", "hard": "🔵", "grass": "🟢"}.get(surface, "🎾")
+    prob_a_pct = round(prob_a * 100, 1)
+    prob_b_pct = round(prob_b * 100, 1)
+    edge_pct = round(max(edge_a, edge_b) * 100, 1)
+
+    odds_a_str = f"{odds_a:.2f}" if odds_a else "N/A"
+    odds_b_str = f"{odds_b:.2f}" if odds_b else "N/A"
+
+    msg = (
+        f"🤖 *DEEPSEEK AI PREDICTION*\n"
+        f"━━━━━━━━━━━━━━━━━━━\n\n"
+        f"🏆 *{m.get('tournament', 'Tournament')}*\n"
+        f"⚔️ *{m['player_a']}* vs *{m['player_b']}*\n"
+        f"{surface_emoji} Surface: {surface.title()}\n\n"
+        f"📊 *Model Probabilities:*\n"
+        f"  {m['player_a']}: {prob_a_pct}%\n"
+        f"  {m['player_b']}: {prob_b_pct}%\n\n"
+        f"💰 *Odds:*\n"
+        f"  {m['player_a']}: {odds_a_str}\n"
+        f"  {m['player_b']}: {odds_b_str}\n\n"
+    )
+
+    if edge_pct > 0:
+        msg += f"💎 *Best Edge:* {focus_player} +{edge_pct}%\n\n"
+
+    # Add model breakdown if available
+    if data_quality != "elo_only" and result:
+        elo_p = round(result.get("elo_prob_a", 0.5) * 100, 1)
+        form_p = round(result.get("form_prob_a", 0.5) * 100, 1)
+        surf_p = round(result.get("surface_prob_a", 0.5) * 100, 1)
+        h2h_p = round(result.get("h2h_prob_a", 0.5) * 100, 1)
+        msg += (
+            f"📐 *Model Breakdown:*\n"
+            f"  Elo (40%): {elo_p}%\n"
+            f"  Form (25%): {form_p}%\n"
+            f"  Surface (20%): {surf_p}%\n"
+            f"  H2H (15%): {h2h_p}%\n\n"
+        )
+
+    msg += (
+        f"🤖 *AI Analysis:*\n"
+        f"_{ai_text}_\n\n"
+        f"━━━━━━━━━━━━━━━━━━━\n"
+        f"_Powered by DeepSeek AI via HuggingFace_"
+    )
+
+    # Telegram has a 4096 char limit
+    if len(msg) > 4000:
+        msg = msg[:3950] + "\n\n_...truncated_"
+
+    await query.edit_message_text(msg, parse_mode="Markdown")
+
+
 # ── /help ─────────────────────────────────────────────────────────────────────
 
 async def help_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -354,6 +533,8 @@ async def help_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         "*Surface Adjustment*\n"
         "We track separate Elo ratings for Clay, Hard, and Grass courts. "
         "A player's clay record is weighted more heavily on clay matches.\n\n"
+        "*AI Predictions*\n"
+        "Use /predict to get DeepSeek AI analysis on any upcoming match.\n\n"
         "*Signal Threshold*\n"
         "We only send signals when edge > 7%.\n\n"
         "*Credits*\n"
@@ -363,6 +544,7 @@ async def help_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         "/balance – Check credits\n"
         "/signals – Latest signals\n"
         "/matches – Upcoming matches & odds\n"
+        "/predict – 🤖 AI match predictions\n"
         "/buy – Purchase credits",
         parse_mode="Markdown"
     )
@@ -530,6 +712,7 @@ def main():
     app.add_handler(CommandHandler("buy",        buy))
     app.add_handler(CommandHandler("signals",    signals))
     app.add_handler(CommandHandler("matches",    matches))
+    app.add_handler(CommandHandler("predict",    predict))
     app.add_handler(CommandHandler("help",       help_cmd))
     # Admin commands
     app.add_handler(CommandHandler("scan",       scan))
@@ -538,6 +721,7 @@ def main():
     # Callbacks
     app.add_handler(CallbackQueryHandler(buy_callback, pattern="^buy_"))
     app.add_handler(CallbackQueryHandler(tournament_callback, pattern="^tourn_"))
+    app.add_handler(CallbackQueryHandler(predict_callback, pattern="^pred_"))
     # Global error handler
     app.add_error_handler(error_handler)
 
