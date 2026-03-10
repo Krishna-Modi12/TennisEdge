@@ -278,7 +278,7 @@ def get_subscribers_with_info() -> list:
 def signal_exists(match_id: str) -> bool:
     conn = get_conn()
     try:
-        cur = conn.execute("SELECT 1 FROM signals WHERE match_id = ?", (match_id,))
+        cur = conn.execute("SELECT 1 FROM signals WHERE match_id = %s", (match_id,))
         return cur.fetchone() is not None
     except Exception:
         conn.rollback()
@@ -291,12 +291,13 @@ def save_signal(match_id, tournament, surface, player_a, player_b,
         cur = conn.execute(
             "INSERT INTO signals (match_id,tournament,surface,player_a,player_b,"
             "bet_on,model_prob,market_prob,edge,odds) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?)",
+            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id",
             (match_id, tournament, surface, player_a, player_b,
              bet_on, model_prob, market_prob, edge, odds),
         )
+        sid = cur.fetchone()[0]
         conn.commit()
-        return cur.lastrowid
+        return sid
     except Exception:
         conn.rollback()
         raise
@@ -307,7 +308,7 @@ def get_recent_signals(limit: int = 5) -> list:
         cur = conn.execute(
             "SELECT id,tournament,surface,player_a,player_b,bet_on,"
             "model_prob,market_prob,edge,odds,created_at "
-            "FROM signals ORDER BY created_at DESC LIMIT ?",
+            "FROM signals ORDER BY created_at DESC LIMIT %s",
             (limit,),
         )
         rows = cur.fetchall()
@@ -333,7 +334,7 @@ def record_delivery(signal_id: int, user_id: int):
     conn = get_conn()
     try:
         conn.execute(
-            "INSERT INTO signal_deliveries (signal_id, user_id) VALUES (?, ?)",
+            "INSERT INTO signal_deliveries (signal_id, user_id) VALUES (%s, %s)",
             (signal_id, user_id),
         )
         conn.commit()
@@ -349,7 +350,7 @@ def record_signal_result(signal_id: int, actual_winner: str) -> dict:
     conn = get_conn()
     try:
         cur = conn.execute(
-            "SELECT bet_on, player_a, player_b FROM signals WHERE id = ?",
+            "SELECT bet_on, player_a, player_b FROM signals WHERE id = %s",
             (signal_id,),
         )
         signal = cur.fetchone()
@@ -363,10 +364,10 @@ def record_signal_result(signal_id: int, actual_winner: str) -> dict:
 
         conn.execute(
             "INSERT INTO signal_results (signal_id, actual_winner, is_correct) "
-            "VALUES (?, ?, ?) "
+            "VALUES (%s, %s, %s) "
             "ON CONFLICT (signal_id) DO UPDATE "
             "SET actual_winner = excluded.actual_winner, is_correct = excluded.is_correct, "
-            "recorded_at = datetime('now')",
+            "recorded_at = NOW()",
             (signal_id, actual_winner, is_correct),
         )
         conn.commit()
@@ -426,7 +427,7 @@ def get_signal_by_id(signal_id: int) -> dict:
         cur = conn.execute(
             "SELECT id, match_id, tournament, surface, player_a, player_b, "
             "bet_on, model_prob, market_prob, edge, odds, created_at "
-            "FROM signals WHERE id = ?",
+            "FROM signals WHERE id = %s",
             (signal_id,),
         )
         r = cur.fetchone()
@@ -451,7 +452,7 @@ def resolve_player_name(name: str) -> str:
     conn = get_conn()
     try:
         cur = conn.execute(
-            "SELECT canonical_name FROM player_aliases WHERE alias = ?",
+            "SELECT canonical_name FROM player_aliases WHERE alias = %s",
             (canonical,),
         )
         r = cur.fetchone()
@@ -467,7 +468,7 @@ def add_player_alias(alias: str, canonical_name: str):
         norm_alias = normalize_player_name(alias)
         norm_canonical = normalize_player_name(canonical_name)
         conn.execute(
-            "INSERT INTO player_aliases (alias, canonical_name) VALUES (?, ?) "
+            "INSERT INTO player_aliases (alias, canonical_name) VALUES (%s, %s) "
             "ON CONFLICT (alias) DO UPDATE SET canonical_name = excluded.canonical_name",
             (norm_alias, norm_canonical),
         )
@@ -495,7 +496,7 @@ def get_elo(player: str, surface: str) -> float:
     conn = get_conn()
     try:
         cur = conn.execute(
-            "SELECT elo_rating FROM player_elo WHERE player_name=? AND surface=?",
+            "SELECT elo_rating FROM player_elo WHERE player_name=%s AND surface=%s",
             (player, surface),
         )
         r = cur.fetchone()
@@ -510,10 +511,10 @@ def upsert_elo(player: str, surface: str, new_rating: float):
     try:
         conn.execute(
             "INSERT INTO player_elo (player_name,surface,elo_rating,matches_played) "
-            "VALUES (?,?,?,1) "
+            "VALUES (%s,%s,%s,1) "
             "ON CONFLICT (player_name,surface) DO UPDATE "
-            "SET elo_rating=?, matches_played=player_elo.matches_played+1, "
-            "updated_at=datetime('now')",
+            "SET elo_rating=%s, matches_played=player_elo.matches_played+1, "
+            "updated_at=NOW()",
             (player, surface, new_rating, new_rating),
         )
         conn.commit()
@@ -542,8 +543,8 @@ def get_pending_signals(max_age_days: int = 7) -> list:
         cur = conn.execute(
             "SELECT id, match_id, player_a, player_b, bet_on, surface, edge, odds "
             "FROM signals WHERE result='pending' "
-            "AND created_at >= datetime('now', ?)",
-            (f"-{max_age_days} days",),
+            "AND created_at >= NOW() - %s * INTERVAL '1 day'",
+            (max_age_days,),
         )
         cols = [d[0] for d in cur.description]
         return [dict(zip(cols, row)) for row in cur.fetchall()]
@@ -557,14 +558,17 @@ def update_signal_result(signal_id: int, result: str, actual_winner: str = None)
     conn = get_conn()
     try:
         conn.execute(
-            "UPDATE signals SET result=?, result_recorded_at=datetime('now') WHERE id=?",
+            "UPDATE signals SET result=%s, result_recorded_at=NOW() WHERE id=%s",
             (result, signal_id),
         )
         if actual_winner:
             actual_winner = normalize_player_name(actual_winner)
             conn.execute(
-                "INSERT OR REPLACE INTO signal_results (signal_id, actual_winner, is_correct, recorded_at) "
-                "VALUES (?, ?, ?, datetime('now'))",
+                "INSERT INTO signal_results (signal_id, actual_winner, is_correct, recorded_at) "
+                "VALUES (%s, %s, %s, NOW()) "
+                "ON CONFLICT (signal_id) DO UPDATE "
+                "SET actual_winner = excluded.actual_winner, is_correct = excluded.is_correct, "
+                "recorded_at = NOW()",
                 (signal_id, actual_winner, 1 if result == 'win' else 0),
             )
         conn.commit()
@@ -578,7 +582,7 @@ def get_user_credits(telegram_id: int) -> int:
     conn = get_conn()
     try:
         cur = conn.execute(
-            "SELECT credits FROM users WHERE telegram_id=?", (telegram_id,)
+            "SELECT credits FROM users WHERE telegram_id=%s", (telegram_id,)
         )
         row = cur.fetchone()
         return row[0] if row else 0
@@ -614,7 +618,7 @@ def get_signal_by_match_id(match_id: str) -> dict:
     try:
         cur = conn.execute(
             "SELECT id, match_id, player_a, player_b, bet_on, surface, edge, odds, result "
-            "FROM signals WHERE match_id=?", (match_id,)
+            "FROM signals WHERE match_id=%s", (match_id,)
         )
         row = cur.fetchone()
         if row:
