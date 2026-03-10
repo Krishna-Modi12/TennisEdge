@@ -1,0 +1,11 @@
+python-telegram-bot==20.7
+requests==2.31.0
+psycopg2-binary==2.9.9
+apscheduler==3.10.4
+python-dotenv==1.0.0
+# Required by ingestion/build_elo_from_history.py to read tennis-data.co.uk Excel files
+# openpyxl: reads modern .xlsx files (2013+)
+# xlrd: reads legacy .xls files (pre-2013 ATP/WTA data)
+openpyxl==3.1.2
+xlrd==2.0.1
+pandas==2.2.0
