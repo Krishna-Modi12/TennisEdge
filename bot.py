@@ -216,7 +216,18 @@ async def buy_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 async def signals(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     recent = get_recent_signals(limit=5)
-    msg    = format_signal_list(recent)
+    if not recent:
+        # Run pipeline on-demand if no signals in DB yet
+        await update.message.reply_text("⏳ Scanning for edges...")
+        try:
+            from signals.edge_detector import detect_edges
+            match_list = fetch_odds()
+            detected = detect_edges(match_list)
+            if detected:
+                recent = get_recent_signals(limit=5)
+        except Exception as e:
+            logger.error(f"On-demand pipeline error: {e}")
+    msg = format_signal_list(recent)
     await update.message.reply_text(msg, parse_mode="Markdown")
 
 
@@ -234,12 +245,35 @@ async def matches(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("📭 No upcoming matches found right now. Check back later!")
         return
 
+    # Also run edge detection so we can show which matches have edges
+    try:
+        from signals.edge_detector import detect_edges, odds_to_prob
+        from models.elo_model import predict
+        from config import EDGE_THRESHOLD
+    except ImportError:
+        pass
+
     lines = ["🎾 *Upcoming Matches*\n"]
     for i, m in enumerate(match_list[:10], 1):
+        edge_text = ""
+        try:
+            model = predict(m["player_a"], m["player_b"], m.get("surface", "hard"))
+            market_a = odds_to_prob(m["odds_a"])
+            market_b = odds_to_prob(m["odds_b"])
+            edge_a = model["prob_a"] - market_a
+            edge_b = model["prob_b"] - market_b
+            if edge_a >= EDGE_THRESHOLD:
+                edge_text = f"   🔥 Edge: {m['player_a']} +{edge_a:.1%}\n"
+            elif edge_b >= EDGE_THRESHOLD:
+                edge_text = f"   🔥 Edge: {m['player_b']} +{edge_b:.1%}\n"
+        except Exception:
+            pass
+
         lines.append(
             f"{i}. *{m['player_a']}* vs *{m['player_b']}*\n"
             f"   🏟 {m['tournament']}  |  🌍 {m['surface'].title()}\n"
             f"   📊 Odds: {m['odds_a']:.2f} / {m['odds_b']:.2f}\n"
+            f"{edge_text}"
         )
     if len(match_list) > 10:
         lines.append(f"\n_...and {len(match_list) - 10} more matches_")

@@ -84,7 +84,11 @@ def fetch_odds() -> list:
     """
     if MOCK_MODE or not ODDS_API_KEY:
         return _mock_odds()
-    return _live_odds()
+    result = _live_odds()
+    if not result:
+        print("[fetch_odds] Live API returned no matches, falling back to mock data.")
+        return _mock_odds()
+    return result
 
 
 def _live_odds() -> list:
