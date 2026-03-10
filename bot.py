@@ -12,6 +12,9 @@ Commands:
 
 import asyncio
 import logging
+import os
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application, CommandHandler, CallbackQueryHandler,
@@ -249,6 +252,9 @@ async def error_handler(update: object, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main():
+    # Start health check HTTP server for Render
+    _start_health_server()
+
     init_schema()
     seed_top_players()
 
@@ -291,3 +297,23 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+# ── Health-check HTTP server (keeps Render web service alive) ────────────────
+
+class _HealthHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"OK")
+
+    def log_message(self, *args):
+        pass  # suppress request logs
+
+
+def _start_health_server():
+    port = int(os.environ.get("PORT", 10000))
+    server = HTTPServer(("0.0.0.0", port), _HealthHandler)
+    t = threading.Thread(target=server.serve_forever, daemon=True)
+    t.start()
+    print(f"Health server listening on :{port}")
