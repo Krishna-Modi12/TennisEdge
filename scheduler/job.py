@@ -98,8 +98,18 @@ def run_pipeline():
     """
     Sync entry point — called by APScheduler in a background thread.
     Fetches odds, detects edges, schedules async delivery into the live bot loop.
+    Also resolves pending paper trades.
     """
     print("[Scheduler] Running pipeline...")
+    
+    # 1. Resolve pending paper trades first
+    try:
+        from ingestion.resolve_matches import resolve_pending_signals
+        resolve_pending_signals()
+    except Exception as e:
+        print(f"[Scheduler] Paper trade resolution error: {e}")
+
+    # 2. Fetch new matches and detect edges
     matches = fetch_odds()
     signals = detect_edges(matches)
 

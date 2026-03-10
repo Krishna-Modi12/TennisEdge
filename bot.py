@@ -142,6 +142,7 @@ async def start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         f"/signals \\– Latest edge signals\n"
         f"/matches \\– Upcoming matches & odds\n"
         f"/predict \\– 🤖 AI match predictions\n"
+        f"/portfolio \\– 📈 Live paper trading record\n"
         f"/balance \\– Check your credits\n"
         f"/buy \\– Purchase credits\n"
         f"/help \\– How it works\n\n"
@@ -537,6 +538,56 @@ async def predict_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             pass
 
 
+# ── /portfolio (Paper Trading) ───────────────────────────────────────────────
+
+async def portfolio(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """View the live paper trading track record of the bot."""
+    from database.db import get_signal_accuracy
+    
+    try:
+        stats = get_signal_accuracy()
+    except Exception as e:
+        logger.error(f"Error fetching portfolio stats: {e}")
+        await update.message.reply_text("❌ Could not fetch portfolio stats right now.")
+        return
+
+    tracked = stats.get('tracked_results', 0)
+    
+    if tracked == 0:
+        await update.message.reply_text(
+            "📈 *Live Paper Trading Portfolio*\n\n"
+            "The bot has started tracking paper trades, but no match results have been finalized yet. "
+            "Check back after the upcoming matches finish!",
+            parse_mode="Markdown"
+        )
+        return
+
+    wins = stats.get('wins', 0)
+    losses = stats.get('losses', 0)
+    roi = stats.get('roi_pct', 0.0)
+    accuracy = stats.get('accuracy_pct', 0.0)
+    avg_odds = stats.get('avg_odds', 0.0)
+    pending = stats.get('untracked', 0)
+    
+    profit_emoji = "🟢" if roi > 0 else ("🔴" if roi < 0 else "⚪")
+    
+    msg = (
+        f"📈 *Live Paper Trading Portfolio*\n"
+        f"━━━━━━━━━━━━━━━━━━━\n\n"
+        f"The bot automatically places a virtual 1-unit flat bet on every valid signal "
+        f"and verifies the result against live data.\n\n"
+        f"*{profit_emoji} ROI: {roi}%*\n"
+        f"🎯 *Win Rate:* {accuracy}%\n"
+        f"⚖️ *Average Odds:* {avg_odds}\n\n"
+        f"✅ *Wins:* {wins}\n"
+        f"❌ *Losses:* {losses}\n"
+        f"⏳ *Pending:* {pending}\n"
+        f"🔢 *Total Tracked:* {tracked}\n\n"
+        f"_Matches are automatically graded when they finish._"
+    )
+    
+    await update.message.reply_text(msg, parse_mode="Markdown")
+
 # ── /help ─────────────────────────────────────────────────────────────────────
 
 async def help_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -562,6 +613,7 @@ async def help_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         "/signals – Latest signals\n"
         "/matches – Upcoming matches & odds\n"
         "/predict – 🤖 AI match predictions\n"
+        "/portfolio – 📈 Live paper trading record\n"
         "/buy – Purchase credits",
         parse_mode="Markdown"
     )
@@ -736,6 +788,7 @@ def main():
     app.add_handler(CommandHandler("signals",    signals))
     app.add_handler(CommandHandler("matches",    matches))
     app.add_handler(CommandHandler("predict",    predict))
+    app.add_handler(CommandHandler("portfolio",  portfolio))
     app.add_handler(CommandHandler("help",       help_cmd))
     # Admin commands
     app.add_handler(CommandHandler("scan",       scan))
