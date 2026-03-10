@@ -293,7 +293,7 @@ async def tournament_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     try:
         from signals.edge_detector import odds_to_prob
-        from models.elo_model import predict
+        from models.advanced_model import advanced_predict as predict
         from config import EDGE_THRESHOLD
     except ImportError:
         pass
@@ -457,8 +457,22 @@ def main():
         _startup_status = "database ready, seeding elo..."
         print("Database schema ready.", flush=True)
         seed_top_players()
-        _startup_status = "elo done, building bot..."
+        _startup_status = "elo done, building stats..."
         print("Elo seeding done.", flush=True)
+
+        # Build player stats in background to avoid blocking bot startup
+        import threading
+        def _build_stats_bg():
+            try:
+                from ingestion.build_player_stats import build_stats
+                print("Building player stats (background)...", flush=True)
+                build_stats(atp_from=2020, atp_to=2025, wta_from=2020, wta_to=2025)
+            except Exception as e:
+                print(f"⚠️ Player stats build failed: {e}", flush=True)
+        threading.Thread(target=_build_stats_bg, daemon=True).start()
+
+        _startup_status = "stats building, starting bot..."
+        print("Stats build started in background.", flush=True)
     except Exception as e:
         tb = traceback.format_exc()
         _startup_status = f"FATAL: {tb}"

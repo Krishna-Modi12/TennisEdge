@@ -9,7 +9,7 @@ meaning zero signals were sent even for perfectly valid matches.
 """
 
 from config import EDGE_THRESHOLD, MIN_ODDS, MAX_ODDS
-from models.elo_model import predict
+from models.advanced_model import advanced_predict as predict
 from database.db import signal_exists, save_signal
 
 
@@ -112,15 +112,22 @@ def _process_match(match: dict) -> dict:
     )
 
     return {
-        "signal_id":   signal_id,
-        "match_id":    match_id,
-        "tournament":  tournament,
-        "surface":     surface,
-        "player_a":    player_a,
-        "player_b":    player_b,
-        "bet_on":      bet_player,
-        "model_prob":  model_prob,
-        "market_prob": market_prob,
-        "edge":        best_edge,
-        "odds":        bet_odds,
+        "signal_id":      signal_id,
+        "match_id":       match_id,
+        "tournament":     tournament,
+        "surface":        surface,
+        "player_a":       player_a,
+        "player_b":       player_b,
+        "bet_on":         bet_player,
+        "model_prob":     model_prob,
+        "market_prob":    market_prob,
+        "edge":           best_edge,
+        "odds":           bet_odds,
+        "elo_prob_a":     model.get("elo_prob_a"),
+        "form_prob_a":    model.get("form_prob_a"),
+        "surface_prob_a": model.get("surface_prob_a"),
+        "h2h_prob_a":     model.get("h2h_prob_a"),
+        "h2h_wins_a":     model.get("h2h_wins_a", 0),
+        "h2h_wins_b":     model.get("h2h_wins_b", 0),
+        "data_quality":   model.get("data_quality", "elo_only"),
     }

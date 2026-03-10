@@ -148,6 +148,26 @@ _SCHEMA_STATEMENTS = [
         winner      TEXT,
         date        TEXT
     )""",
+    """CREATE TABLE IF NOT EXISTS player_stats (
+        id               SERIAL PRIMARY KEY,
+        player_name      TEXT NOT NULL,
+        surface          TEXT NOT NULL,
+        form_score       NUMERIC(5,4),
+        surface_win_rate NUMERIC(5,4),
+        matches_counted  INTEGER DEFAULT 0,
+        updated_at       TIMESTAMP DEFAULT NOW(),
+        UNIQUE(player_name, surface)
+    )""",
+    """CREATE TABLE IF NOT EXISTS h2h_records (
+        id            SERIAL PRIMARY KEY,
+        player_a      TEXT NOT NULL,
+        player_b      TEXT NOT NULL,
+        surface       TEXT NOT NULL,
+        wins_a        INTEGER DEFAULT 0,
+        wins_b        INTEGER DEFAULT 0,
+        updated_at    TIMESTAMP DEFAULT NOW(),
+        UNIQUE(player_a, player_b, surface)
+    )""",
 ]
 
 
@@ -532,6 +552,103 @@ def get_elo_player_count() -> int:
     try:
         cur = conn.execute("SELECT COUNT(DISTINCT player_name) FROM player_elo")
         return cur.fetchone()[0]
+    except Exception:
+        conn.rollback()
+        raise
+
+
+# ── Player stats helpers (advanced model) ─────────────────────────────────────
+
+def get_player_stats(player: str, surface: str) -> dict:
+    """Get player form score and surface win rate. Returns None if not found."""
+    player = resolve_player_name(player)
+    conn = get_conn()
+    try:
+        cur = conn.execute(
+            "SELECT form_score, surface_win_rate, matches_counted "
+            "FROM player_stats WHERE player_name=%s AND surface=%s",
+            (player, surface),
+        )
+        r = cur.fetchone()
+        if r:
+            return {
+                "form_score": float(r[0]) if r[0] is not None else None,
+                "surface_win_rate": float(r[1]) if r[1] is not None else None,
+                "matches_counted": r[2] or 0,
+            }
+        return None
+    except Exception:
+        conn.rollback()
+        raise
+
+
+def upsert_player_stats(player: str, surface: str, form_score: float,
+                        surface_win_rate: float, matches_counted: int):
+    player = resolve_player_name(player)
+    conn = get_conn()
+    try:
+        conn.execute(
+            "INSERT INTO player_stats (player_name, surface, form_score, "
+            "surface_win_rate, matches_counted) VALUES (%s,%s,%s,%s,%s) "
+            "ON CONFLICT (player_name, surface) DO UPDATE SET "
+            "form_score=%s, surface_win_rate=%s, matches_counted=%s, updated_at=NOW()",
+            (player, surface, form_score, surface_win_rate, matches_counted,
+             form_score, surface_win_rate, matches_counted),
+        )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+
+
+def get_h2h_record(player_a: str, player_b: str, surface: str) -> dict:
+    """Get H2H record. Players are sorted alphabetically internally.
+    Returns {"wins_a": int, "wins_b": int} where a/b are the sorted names."""
+    player_a = resolve_player_name(player_a)
+    player_b = resolve_player_name(player_b)
+    sorted_a, sorted_b = sorted([player_a, player_b])
+    conn = get_conn()
+    try:
+        cur = conn.execute(
+            "SELECT wins_a, wins_b FROM h2h_records "
+            "WHERE player_a=%s AND player_b=%s AND surface=%s",
+            (sorted_a, sorted_b, surface),
+        )
+        r = cur.fetchone()
+        if r:
+            wa, wb = r[0], r[1]
+            # If caller's player_a matches sorted_a, wins are in correct order
+            if player_a == sorted_a:
+                return {"wins_a": wa, "wins_b": wb}
+            else:
+                return {"wins_a": wb, "wins_b": wa}
+        return None
+    except Exception:
+        conn.rollback()
+        raise
+
+
+def upsert_h2h(player_a: str, player_b: str, surface: str,
+               wins_a: int, wins_b: int):
+    """Store H2H record. Players are sorted alphabetically."""
+    player_a = resolve_player_name(player_a)
+    player_b = resolve_player_name(player_b)
+    sorted_a, sorted_b = sorted([player_a, player_b])
+    # Ensure wins match sorted order
+    if player_a == sorted_a:
+        wa, wb = wins_a, wins_b
+    else:
+        wa, wb = wins_b, wins_a
+    conn = get_conn()
+    try:
+        conn.execute(
+            "INSERT INTO h2h_records (player_a, player_b, surface, wins_a, wins_b) "
+            "VALUES (%s,%s,%s,%s,%s) "
+            "ON CONFLICT (player_a, player_b, surface) DO UPDATE SET "
+            "wins_a=%s, wins_b=%s, updated_at=NOW()",
+            (sorted_a, sorted_b, surface, wa, wb, wa, wb),
+        )
+        conn.commit()
     except Exception:
         conn.rollback()
         raise

@@ -61,6 +61,27 @@ def format_signal(signal: dict) -> str:
         f"📊 *Model Probability:* {model_pct}%\n"
         f"📉 *Market Probability:* {market_pct}%\n\n"
         f"🔥 *EDGE: +{edge_pct}%*\n\n"
+    )
+
+    # Add model breakdown if advanced model data is present
+    if signal.get("data_quality") and signal["data_quality"] != "elo_only":
+        elo_p   = round(signal.get("elo_prob_a", 0.5) * 100, 1)
+        form_p  = round(signal.get("form_prob_a", 0.5) * 100, 1)
+        surf_p  = round(signal.get("surface_prob_a", 0.5) * 100, 1)
+        h2h_p   = round(signal.get("h2h_prob_a", 0.5) * 100, 1)
+        h2h_wa  = signal.get("h2h_wins_a", 0)
+        h2h_wb  = signal.get("h2h_wins_b", 0)
+        quality = signal["data_quality"].replace("_", " ").title()
+
+        msg += (
+            f"📐 *Model Breakdown ({quality}):*\n"
+            f"  Elo Rating (40%): {elo_p}%\n"
+            f"  Recent Form (25%): {form_p}%\n"
+            f"  Surface WR (20%): {surf_p}%\n"
+            f"  H2H (15%): {h2h_p}% ({h2h_wa}-{h2h_wb})\n\n"
+        )
+
+    msg += (
         f"━━━━━━━━━━━━━━━━━━━\n"
         f"_1 credit deducted from your balance_"
     )
