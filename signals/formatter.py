@@ -94,6 +94,20 @@ def format_signal(signal: dict) -> str:
     return msg
 
 
+def format_signal_with_ai(signal: dict, ai_text: str) -> str:
+    """Format a signal with AI analysis appended. Falls back to plain signal if no AI text."""
+    msg = format_signal(signal)
+    if ai_text:
+        escaped_ai = _escape(ai_text)
+        msg = msg.replace(
+            "━━━━━━━━━━━━━━━━━━━\n_1 credit deducted from your balance_",
+            f"🤖 *AI Analysis:*\n_{escaped_ai}_\n\n"
+            f"━━━━━━━━━━━━━━━━━━━\n"
+            f"_1 credit deducted from your balance_"
+        )
+    return msg
+
+
 def format_signal_list(signals: list) -> str:
     if not signals:
         return "📭 No recent signals found."

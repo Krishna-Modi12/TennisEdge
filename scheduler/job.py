@@ -41,14 +41,34 @@ def set_loop(loop: asyncio.AbstractEventLoop):
 async def _send_signal_to_subscribers(signal: dict):
     """Async: send one signal to every subscriber who has credits."""
     from database.db import get_all_subscribers, deduct_credit, get_user
-    from signals.formatter import format_signal
+    from signals.formatter import format_signal, format_signal_with_ai
 
     if _bot_app is None:
         print("[Scheduler] Bot app not set — cannot send signals.")
         return
 
+    # Generate AI analysis (non-blocking, fails gracefully)
+    ai_text = ""
+    try:
+        from ai.analyzer import generate_match_analysis
+        ai_text = await generate_match_analysis(
+            player=signal.get("bet_on", ""),
+            opponent=signal.get("player_b", "") if signal.get("bet_on") == signal.get("player_a") else signal.get("player_a", ""),
+            surface=signal.get("surface", "hard"),
+            model_prob=signal.get("model_prob", 0.5),
+            odds=signal.get("odds", 2.0),
+            value_edge=signal.get("value_edge", 0),
+            data_quality=signal.get("data_quality", "unknown"),
+            elo_prob=signal.get("elo_prob_a"),
+            form_prob=signal.get("form_prob_a"),
+            surface_prob=signal.get("surface_prob_a"),
+            h2h_prob=signal.get("h2h_prob_a"),
+        )
+    except Exception as e:
+        print(f"[Scheduler] AI analysis skipped: {e}")
+
     subscribers = get_all_subscribers()
-    msg = format_signal(signal)
+    msg = format_signal_with_ai(signal, ai_text) if ai_text else format_signal(signal)
 
     for telegram_id in subscribers:
         user = get_user(telegram_id)
