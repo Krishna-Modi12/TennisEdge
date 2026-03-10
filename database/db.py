@@ -1,104 +1,185 @@
 """
-database/db.py  –  PostgreSQL connection pool + all helpers
+database/db.py  –  PostgreSQL database + all helpers
 
-BUG FIX: Added rollback() in except blocks throughout.
-Without rollback, a failed query leaves the connection in an aborted
-transaction state. Returning that connection to the pool causes every
-subsequent caller that gets it to immediately fail with
-"InFailedSqlTransaction" — silently breaking all DB operations.
+Thread-safe via per-thread connections with psycopg2.
 """
 
+import logging
+import threading
 import psycopg2
-from psycopg2 import pool
+import psycopg2.extras
 from config import DATABASE_URL
+from utils import normalize_player_name
 
-_pool = None
+logger = logging.getLogger(__name__)
 
-
-def get_pool():
-    global _pool
-    if _pool is None:
-        # ThreadedConnectionPool is safe for concurrent access from the
-        # APScheduler background thread + Telegram bot main thread.
-        _pool = psycopg2.pool.ThreadedConnectionPool(1, 10, DATABASE_URL)
-    return _pool
+_local = threading.local()
 
 
-def get_conn():
-    return get_pool().getconn()
+class _ConnWrapper:
+    """Thin wrapper providing sqlite3-compatible .execute() on a psycopg2 connection."""
+
+    def __init__(self, raw):
+        self._conn = raw
+
+    def execute(self, sql, params=None):
+        cur = self._conn.cursor()
+        cur.execute(sql, params)
+        return cur
+
+    def executemany(self, sql, params_list):
+        cur = self._conn.cursor()
+        cur.executemany(sql, params_list)
+        return cur
+
+    def commit(self):
+        self._conn.commit()
+
+    def rollback(self):
+        self._conn.rollback()
+
+    def close(self):
+        self._conn.close()
+
+    @property
+    def closed(self):
+        return self._conn.closed
+
+    def __enter__(self):
+        self._conn.__enter__()
+        return self
+
+    def __exit__(self, *args):
+        return self._conn.__exit__(*args)
+
+
+def get_conn() -> _ConnWrapper:
+    """Return a thread-local PostgreSQL connection."""
+    wrapper = getattr(_local, "conn", None)
+    if wrapper is None or wrapper.closed:
+        raw = psycopg2.connect(DATABASE_URL)
+        wrapper = _ConnWrapper(raw)
+        _local.conn = wrapper
+    return wrapper
 
 
 def release_conn(conn):
-    get_pool().putconn(conn)
+    """No-op (connections are thread-local and reused)."""
+    pass
 
 
 # ── Schema ────────────────────────────────────────────────────────────────────
 
-SCHEMA = """
-CREATE TABLE IF NOT EXISTS users (
-    id          SERIAL PRIMARY KEY,
-    telegram_id BIGINT UNIQUE NOT NULL,
-    username    TEXT,
-    credits     INTEGER DEFAULT 0,
-    created_at  TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS transactions (
-    id             SERIAL PRIMARY KEY,
-    user_id        INTEGER REFERENCES users(id),
-    credits_added  INTEGER,
-    payment_amount NUMERIC(10,2),
-    payment_id     TEXT,
-    package        TEXT,
-    timestamp      TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS signals (
-    id           SERIAL PRIMARY KEY,
-    match_id     TEXT UNIQUE,
-    tournament   TEXT,
-    surface      TEXT,
-    player_a     TEXT,
-    player_b     TEXT,
-    bet_on       TEXT,
-    model_prob   NUMERIC(5,4),
-    market_prob  NUMERIC(5,4),
-    edge         NUMERIC(5,4),
-    odds         NUMERIC(6,2),
-    created_at   TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS signal_deliveries (
-    id           SERIAL PRIMARY KEY,
-    signal_id    INTEGER REFERENCES signals(id),
-    user_id      INTEGER REFERENCES users(id),
-    delivered_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS player_elo (
-    id             SERIAL PRIMARY KEY,
-    player_name    TEXT NOT NULL,
-    surface        TEXT NOT NULL,
-    elo_rating     NUMERIC(8,2) DEFAULT 1500,
-    matches_played INTEGER DEFAULT 0,
-    updated_at     TIMESTAMPTZ DEFAULT NOW(),
-    UNIQUE(player_name, surface)
-);
-"""
+_SCHEMA_STATEMENTS = [
+    """CREATE TABLE IF NOT EXISTS users (
+        id          SERIAL PRIMARY KEY,
+        telegram_id BIGINT UNIQUE NOT NULL,
+        username    TEXT,
+        credits     INTEGER DEFAULT 0,
+        created_at  TIMESTAMP DEFAULT NOW()
+    )""",
+    """CREATE TABLE IF NOT EXISTS transactions (
+        id             SERIAL PRIMARY KEY,
+        user_id        INTEGER REFERENCES users(id),
+        credits_added  INTEGER,
+        payment_amount REAL DEFAULT 0,
+        payment_id     TEXT,
+        package        TEXT,
+        timestamp      TIMESTAMP DEFAULT NOW()
+    )""",
+    """CREATE TABLE IF NOT EXISTS signals (
+        id           SERIAL PRIMARY KEY,
+        match_id     TEXT UNIQUE,
+        tournament   TEXT,
+        surface      TEXT,
+        player_a     TEXT,
+        player_b     TEXT,
+        bet_on       TEXT,
+        model_prob   REAL,
+        market_prob  REAL,
+        edge         REAL,
+        odds         REAL,
+        result       TEXT DEFAULT 'pending',
+        result_recorded_at TIMESTAMP,
+        created_at   TIMESTAMP DEFAULT NOW()
+    )""",
+    """CREATE TABLE IF NOT EXISTS signal_deliveries (
+        id           SERIAL PRIMARY KEY,
+        signal_id    INTEGER REFERENCES signals(id),
+        user_id      INTEGER REFERENCES users(id),
+        delivered_at TIMESTAMP DEFAULT NOW()
+    )""",
+    """CREATE TABLE IF NOT EXISTS signal_results (
+        id            SERIAL PRIMARY KEY,
+        signal_id     INTEGER REFERENCES signals(id) UNIQUE,
+        actual_winner TEXT NOT NULL,
+        is_correct    INTEGER NOT NULL DEFAULT 0,
+        recorded_at   TIMESTAMP DEFAULT NOW()
+    )""",
+    """CREATE TABLE IF NOT EXISTS player_elo (
+        id             SERIAL PRIMARY KEY,
+        player_name    TEXT NOT NULL,
+        surface        TEXT NOT NULL,
+        elo_rating     REAL DEFAULT 1500,
+        matches_played INTEGER DEFAULT 0,
+        updated_at     TIMESTAMP DEFAULT NOW(),
+        UNIQUE(player_name, surface)
+    )""",
+    """CREATE TABLE IF NOT EXISTS player_aliases (
+        alias          TEXT PRIMARY KEY,
+        canonical_name TEXT NOT NULL
+    )""",
+    """CREATE TABLE IF NOT EXISTS matches (
+        id          SERIAL PRIMARY KEY,
+        date        TEXT,
+        player1     TEXT,
+        player2     TEXT,
+        surface     TEXT,
+        winner      TEXT,
+        odds_p1     REAL,
+        odds_p2     REAL,
+        tournament  TEXT
+    )""",
+    """CREATE TABLE IF NOT EXISTS h2h (
+        id          SERIAL PRIMARY KEY,
+        player1     TEXT,
+        player2     TEXT,
+        surface     TEXT,
+        winner      TEXT,
+        date        TEXT
+    )""",
+]
 
 
 def init_schema():
     conn = get_conn()
     try:
-        with conn.cursor() as cur:
-            cur.execute(SCHEMA)
+        for stmt in _SCHEMA_STATEMENTS:
+            conn.execute(stmt)
         conn.commit()
-        print("[DB] Schema ready.")
-    except Exception as e:
+        _migrate_signals_result_columns(conn)
+        from signals.odds_movement import migrate_odds_movement
+        migrate_odds_movement()
+        logger.info("[DB] PostgreSQL schema ready.")
+    except Exception:
         conn.rollback()
-        raise RuntimeError(f"[DB] Schema init failed: {e}") from e
-    finally:
-        release_conn(conn)
+        raise
+
+
+def _migrate_signals_result_columns(conn):
+    """Add result + result_recorded_at columns if they don't exist."""
+    cur = conn.execute(
+        "SELECT column_name FROM information_schema.columns "
+        "WHERE table_name = 'signals'"
+    )
+    columns = {row[0] for row in cur.fetchall()}
+    if "result" not in columns:
+        conn.execute("ALTER TABLE signals ADD COLUMN result TEXT DEFAULT 'pending'")
+        logger.info("[DB] Migrated: added 'result' column to signals.")
+    if "result_recorded_at" not in columns:
+        conn.execute("ALTER TABLE signals ADD COLUMN result_recorded_at TIMESTAMP")
+        logger.info("[DB] Migrated: added 'result_recorded_at' column to signals.")
+    conn.commit()
 
 
 # ── User helpers ──────────────────────────────────────────────────────────────
@@ -106,100 +187,90 @@ def init_schema():
 def get_or_create_user(telegram_id: int, username: str = None) -> dict:
     conn = get_conn()
     try:
-        with conn.cursor() as cur:
-            cur.execute(
-                "INSERT INTO users (telegram_id, username) VALUES (%s, %s) "
-                "ON CONFLICT (telegram_id) DO UPDATE SET username = EXCLUDED.username "
-                "RETURNING id, telegram_id, username, credits",
-                (telegram_id, username)
-            )
-            r = cur.fetchone()
+        conn.execute(
+            "INSERT INTO users (telegram_id, username) VALUES (%s, %s) "
+            "ON CONFLICT (telegram_id) DO UPDATE SET username = excluded.username",
+            (telegram_id, username),
+        )
         conn.commit()
+        cur = conn.execute(
+            "SELECT id, telegram_id, username, credits FROM users WHERE telegram_id = %s",
+            (telegram_id,),
+        )
+        r = cur.fetchone()
         return {"id": r[0], "telegram_id": r[1], "username": r[2], "credits": r[3]}
-    except Exception as e:
+    except Exception:
         conn.rollback()
-        raise e
-    finally:
-        release_conn(conn)
-
+        raise
 
 def get_user(telegram_id: int) -> dict:
     conn = get_conn()
     try:
-        with conn.cursor() as cur:
-            cur.execute(
-                "SELECT id, telegram_id, username, credits FROM users WHERE telegram_id = %s",
-                (telegram_id,)
-            )
-            r = cur.fetchone()
+        cur = conn.execute(
+            "SELECT id, telegram_id, username, credits FROM users WHERE telegram_id = %s",
+            (telegram_id,),
+        )
+        r = cur.fetchone()
         if not r:
             return None
         return {"id": r[0], "telegram_id": r[1], "username": r[2], "credits": r[3]}
-    except Exception as e:
+    except Exception:
         conn.rollback()
-        raise e
-    finally:
-        release_conn(conn)
+        raise
 
-
-def add_credits_manual(user_id: int, credits: int) -> int:
-    """
-    Admin: add credits without payment. Returns the new balance.
-    BUG FIX: Now returns new balance so callers don't show stale data.
-    """
+def add_credits_manual(user_id: int, credits: int):
+    """Admin command – add credits without payment."""
     conn = get_conn()
     try:
-        with conn.cursor() as cur:
-            cur.execute(
-                "UPDATE users SET credits = credits + %s WHERE id = %s RETURNING credits",
-                (credits, user_id)
-            )
-            new_balance = cur.fetchone()[0]
-            cur.execute(
-                "INSERT INTO transactions (user_id, credits_added, payment_amount, payment_id, package) "
-                "VALUES (%s, %s, 0, 'manual', 'manual')",
-                (user_id, credits)
-            )
+        conn.execute("UPDATE users SET credits = credits + %s WHERE id = %s", (credits, user_id))
+        conn.execute(
+            "INSERT INTO transactions (user_id, credits_added, payment_amount, payment_id, package) "
+            "VALUES (%s, %s, 0, 'manual', 'manual')",
+            (user_id, credits),
+        )
         conn.commit()
-        return new_balance
-    except Exception as e:
+    except Exception:
         conn.rollback()
-        raise e
-    finally:
-        release_conn(conn)
-
+        raise
 
 def deduct_credit(user_id: int) -> bool:
     conn = get_conn()
     try:
-        with conn.cursor() as cur:
-            cur.execute(
-                "UPDATE users SET credits = credits - 1 "
-                "WHERE id = %s AND credits > 0 RETURNING credits",
-                (user_id,)
-            )
-            r = cur.fetchone()
+        cur = conn.execute(
+            "UPDATE users SET credits = credits - 1 WHERE id = %s AND credits > 0",
+            (user_id,),
+        )
         conn.commit()
-        return r is not None
-    except Exception as e:
+        return cur.rowcount > 0
+    except Exception:
         conn.rollback()
-        raise e
-    finally:
-        release_conn(conn)
-
+        raise
 
 def get_all_subscribers() -> list:
     """All users with credits > 0."""
     conn = get_conn()
     try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT telegram_id FROM users WHERE credits > 0")
-            return [r[0] for r in cur.fetchall()]
-    except Exception as e:
+        cur = conn.execute("SELECT telegram_id FROM users WHERE credits > 0")
+        return [r[0] for r in cur.fetchall()]
+    except Exception:
         conn.rollback()
-        raise e
-    finally:
-        release_conn(conn)
+        raise
+
+
+def get_subscribers_with_info() -> list:
+    """All users with credits > 0 — returns full user dicts (avoids N+1)."""
+    conn = get_conn()
+    try:
+        cur = conn.execute(
+            "SELECT id, telegram_id, username, credits FROM users WHERE credits > 0"
+        )
+        return [
+            {"id": r[0], "telegram_id": r[1], "username": r[2], "credits": r[3]}
+            for r in cur.fetchall()
+        ]
+    except Exception:
+        conn.rollback()
+        raise
 
 
 # ── Signal helpers ────────────────────────────────────────────────────────────
@@ -207,50 +278,39 @@ def get_all_subscribers() -> list:
 def signal_exists(match_id: str) -> bool:
     conn = get_conn()
     try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT 1 FROM signals WHERE match_id = %s", (match_id,))
-            return cur.fetchone() is not None
-    except Exception as e:
+        cur = conn.execute("SELECT 1 FROM signals WHERE match_id = ?", (match_id,))
+        return cur.fetchone() is not None
+    except Exception:
         conn.rollback()
-        raise e
-    finally:
-        release_conn(conn)
-
+        raise
 
 def save_signal(match_id, tournament, surface, player_a, player_b,
                 bet_on, model_prob, market_prob, edge, odds) -> int:
     conn = get_conn()
     try:
-        with conn.cursor() as cur:
-            cur.execute(
-                "INSERT INTO signals "
-                "(match_id,tournament,surface,player_a,player_b,"
-                "bet_on,model_prob,market_prob,edge,odds) "
-                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id",
-                (match_id, tournament, surface, player_a, player_b,
-                 bet_on, model_prob, market_prob, edge, odds)
-            )
-            sid = cur.fetchone()[0]
+        cur = conn.execute(
+            "INSERT INTO signals (match_id,tournament,surface,player_a,player_b,"
+            "bet_on,model_prob,market_prob,edge,odds) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?)",
+            (match_id, tournament, surface, player_a, player_b,
+             bet_on, model_prob, market_prob, edge, odds),
+        )
         conn.commit()
-        return sid
-    except Exception as e:
+        return cur.lastrowid
+    except Exception:
         conn.rollback()
-        raise e
-    finally:
-        release_conn(conn)
-
+        raise
 
 def get_recent_signals(limit: int = 5) -> list:
     conn = get_conn()
     try:
-        with conn.cursor() as cur:
-            cur.execute(
-                "SELECT id,tournament,surface,player_a,player_b,bet_on,"
-                "model_prob,market_prob,edge,odds,created_at "
-                "FROM signals ORDER BY created_at DESC LIMIT %s",
-                (limit,)
-            )
-            rows = cur.fetchall()
+        cur = conn.execute(
+            "SELECT id,tournament,surface,player_a,player_b,bet_on,"
+            "model_prob,market_prob,edge,odds,created_at "
+            "FROM signals ORDER BY created_at DESC LIMIT ?",
+            (limit,),
+        )
+        rows = cur.fetchall()
         return [
             {
                 "id": r[0], "tournament": r[1], "surface": r[2],
@@ -261,49 +321,306 @@ def get_recent_signals(limit: int = 5) -> list:
             }
             for r in rows
         ]
-    except Exception as e:
+    except Exception:
         conn.rollback()
-        raise e
-    finally:
-        release_conn(conn)
+        raise
+
+
+# ── Delivery tracking ─────────────────────────────────────────────────────────
+
+def record_delivery(signal_id: int, user_id: int):
+    """Record that a signal was successfully delivered to a user."""
+    conn = get_conn()
+    try:
+        conn.execute(
+            "INSERT INTO signal_deliveries (signal_id, user_id) VALUES (?, ?)",
+            (signal_id, user_id),
+        )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+
+
+# ── Signal result tracking ────────────────────────────────────────────────────
+
+def record_signal_result(signal_id: int, actual_winner: str) -> dict:
+    """Record the actual outcome of a signal. Returns the signal result info."""
+    conn = get_conn()
+    try:
+        cur = conn.execute(
+            "SELECT bet_on, player_a, player_b FROM signals WHERE id = ?",
+            (signal_id,),
+        )
+        signal = cur.fetchone()
+        if not signal:
+            return None
+
+        bet_on = signal[0]
+        norm_winner = normalize_player_name(actual_winner)
+        norm_bet = normalize_player_name(bet_on)
+        is_correct = 1 if norm_winner == norm_bet else 0
+
+        conn.execute(
+            "INSERT INTO signal_results (signal_id, actual_winner, is_correct) "
+            "VALUES (?, ?, ?) "
+            "ON CONFLICT (signal_id) DO UPDATE "
+            "SET actual_winner = excluded.actual_winner, is_correct = excluded.is_correct, "
+            "recorded_at = datetime('now')",
+            (signal_id, actual_winner, is_correct),
+        )
+        conn.commit()
+        return {
+            "signal_id": signal_id,
+            "bet_on": bet_on,
+            "actual_winner": actual_winner,
+            "is_correct": bool(is_correct),
+        }
+    except Exception:
+        conn.rollback()
+        raise
+
+def get_signal_accuracy() -> dict:
+    """Return overall signal accuracy and ROI stats."""
+    conn = get_conn()
+    try:
+        cur = conn.execute("""
+            SELECT
+                COUNT(*) AS total,
+                SUM(CASE WHEN r.is_correct = 1 THEN 1 ELSE 0 END) AS wins,
+                SUM(CASE WHEN r.is_correct = 0 THEN 1 ELSE 0 END) AS losses,
+                SUM(CASE WHEN r.is_correct = 1 THEN s.odds - 1.0 ELSE -1.0 END) AS total_profit,
+                AVG(s.odds) AS avg_odds
+            FROM signal_results r
+            JOIN signals s ON r.signal_id = s.id
+        """)
+        r = cur.fetchone()
+        total, wins, losses = r[0], r[1] or 0, r[2] or 0
+        total_profit = r[3] or 0.0
+        avg_odds = r[4] or 0.0
+        
+        accuracy = round(wins / total * 100, 1) if total > 0 else 0.0
+        roi = round((total_profit / total) * 100, 1) if total > 0 else 0.0
+
+        cur2 = conn.execute("SELECT COUNT(*) FROM signals")
+        total_signals = cur2.fetchone()[0]
+
+        return {
+            "total_signals": total_signals,
+            "tracked_results": total,
+            "wins": wins,
+            "losses": losses,
+            "accuracy_pct": accuracy,
+            "untracked": total_signals - total,
+            "roi_pct": roi,
+            "avg_odds": round(avg_odds, 2),
+        }
+    except Exception:
+        conn.rollback()
+        raise
+
+def get_signal_by_id(signal_id: int) -> dict:
+    """Fetch a single signal by ID."""
+    conn = get_conn()
+    try:
+        cur = conn.execute(
+            "SELECT id, match_id, tournament, surface, player_a, player_b, "
+            "bet_on, model_prob, market_prob, edge, odds, created_at "
+            "FROM signals WHERE id = ?",
+            (signal_id,),
+        )
+        r = cur.fetchone()
+        if not r:
+            return None
+        return {
+            "id": r[0], "match_id": r[1], "tournament": r[2], "surface": r[3],
+            "player_a": r[4], "player_b": r[5], "bet_on": r[6],
+            "model_prob": float(r[7]), "market_prob": float(r[8]),
+            "edge": float(r[9]), "odds": float(r[10]), "created_at": r[11],
+        }
+    except Exception:
+        conn.rollback()
+        raise
+
+
+# ── Player name resolution ────────────────────────────────────────────────────
+
+def resolve_player_name(name: str) -> str:
+    """Normalize name, then check alias table for a canonical mapping."""
+    canonical = normalize_player_name(name)
+    conn = get_conn()
+    try:
+        cur = conn.execute(
+            "SELECT canonical_name FROM player_aliases WHERE alias = ?",
+            (canonical,),
+        )
+        r = cur.fetchone()
+        return r[0] if r else canonical
+    except Exception:
+        return canonical
+
+
+def add_player_alias(alias: str, canonical_name: str):
+    """Map an alternate name to a canonical name."""
+    conn = get_conn()
+    try:
+        norm_alias = normalize_player_name(alias)
+        norm_canonical = normalize_player_name(canonical_name)
+        conn.execute(
+            "INSERT INTO player_aliases (alias, canonical_name) VALUES (?, ?) "
+            "ON CONFLICT (alias) DO UPDATE SET canonical_name = excluded.canonical_name",
+            (norm_alias, norm_canonical),
+        )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+
+
+def get_player_aliases() -> list:
+    """Return all alias mappings."""
+    conn = get_conn()
+    try:
+        cur = conn.execute("SELECT alias, canonical_name FROM player_aliases ORDER BY alias")
+        return [{"alias": r[0], "canonical": r[1]} for r in cur.fetchall()]
+    except Exception:
+        conn.rollback()
+        raise
 
 
 # ── Elo helpers ───────────────────────────────────────────────────────────────
 
 def get_elo(player: str, surface: str) -> float:
+    player = resolve_player_name(player)
     conn = get_conn()
     try:
-        with conn.cursor() as cur:
-            cur.execute(
-                "SELECT elo_rating FROM player_elo "
-                "WHERE player_name=%s AND surface=%s",
-                (player, surface)
-            )
-            r = cur.fetchone()
+        cur = conn.execute(
+            "SELECT elo_rating FROM player_elo WHERE player_name=? AND surface=?",
+            (player, surface),
+        )
+        r = cur.fetchone()
         return float(r[0]) if r else 1500.0
-    except Exception as e:
+    except Exception:
         conn.rollback()
-        raise e
-    finally:
-        release_conn(conn)
-
+        raise
 
 def upsert_elo(player: str, surface: str, new_rating: float):
+    player = resolve_player_name(player)
     conn = get_conn()
     try:
-        with conn.cursor() as cur:
-            cur.execute(
-                "INSERT INTO player_elo (player_name,surface,elo_rating,matches_played) "
-                "VALUES (%s,%s,%s,1) "
-                "ON CONFLICT (player_name,surface) DO UPDATE "
-                "SET elo_rating=%s, "
-                "matches_played=player_elo.matches_played+1, "
-                "updated_at=NOW()",
-                (player, surface, new_rating, new_rating)
+        conn.execute(
+            "INSERT INTO player_elo (player_name,surface,elo_rating,matches_played) "
+            "VALUES (?,?,?,1) "
+            "ON CONFLICT (player_name,surface) DO UPDATE "
+            "SET elo_rating=?, matches_played=player_elo.matches_played+1, "
+            "updated_at=datetime('now')",
+            (player, surface, new_rating, new_rating),
+        )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+
+
+def get_elo_player_count() -> int:
+    """Return the number of unique players with Elo ratings."""
+    conn = get_conn()
+    try:
+        cur = conn.execute("SELECT COUNT(DISTINCT player_name) FROM player_elo")
+        return cur.fetchone()[0]
+    except Exception:
+        conn.rollback()
+        raise
+
+
+# ── Signal result tracking ────────────────────────────────────────────────────
+
+def get_pending_signals(max_age_days: int = 7) -> list:
+    """Return signals with result='pending' created within max_age_days."""
+    conn = get_conn()
+    try:
+        cur = conn.execute(
+            "SELECT id, match_id, player_a, player_b, bet_on, surface, edge, odds "
+            "FROM signals WHERE result='pending' "
+            "AND created_at >= datetime('now', ?)",
+            (f"-{max_age_days} days",),
+        )
+        cols = [d[0] for d in cur.description]
+        return [dict(zip(cols, row)) for row in cur.fetchall()]
+    except Exception:
+        conn.rollback()
+        raise
+
+
+def update_signal_result(signal_id: int, result: str, actual_winner: str = None):
+    """Set signal result to 'win' or 'loss' with timestamp."""
+    conn = get_conn()
+    try:
+        conn.execute(
+            "UPDATE signals SET result=?, result_recorded_at=datetime('now') WHERE id=?",
+            (result, signal_id),
+        )
+        if actual_winner:
+            actual_winner = normalize_player_name(actual_winner)
+            conn.execute(
+                "INSERT OR REPLACE INTO signal_results (signal_id, actual_winner, is_correct, recorded_at) "
+                "VALUES (?, ?, ?, datetime('now'))",
+                (signal_id, actual_winner, 1 if result == 'win' else 0),
             )
         conn.commit()
-    except Exception as e:
+    except Exception:
         conn.rollback()
-        raise e
-    finally:
-        release_conn(conn)
+        raise
+
+
+def get_user_credits(telegram_id: int) -> int:
+    """Return credit balance for a user by telegram_id."""
+    conn = get_conn()
+    try:
+        cur = conn.execute(
+            "SELECT credits FROM users WHERE telegram_id=?", (telegram_id,)
+        )
+        row = cur.fetchone()
+        return row[0] if row else 0
+    except Exception:
+        conn.rollback()
+        raise
+
+
+def get_stats_by_surface() -> list:
+    """Return signal win/loss stats grouped by surface."""
+    conn = get_conn()
+    try:
+        cur = conn.execute(
+            "SELECT surface, "
+            "  COUNT(*) as total, "
+            "  SUM(CASE WHEN result='win' THEN 1 ELSE 0 END) as wins, "
+            "  SUM(CASE WHEN result='loss' THEN 1 ELSE 0 END) as losses, "
+            "  AVG(CASE WHEN result='win' THEN edge ELSE NULL END) as avg_edge_wins, "
+            "  AVG(CASE WHEN result='loss' THEN edge ELSE NULL END) as avg_edge_losses "
+            "FROM signals WHERE result IN ('win', 'loss') "
+            "GROUP BY surface ORDER BY total DESC"
+        )
+        cols = [d[0] for d in cur.description]
+        return [dict(zip(cols, row)) for row in cur.fetchall()]
+    except Exception:
+        conn.rollback()
+        raise
+
+
+def get_signal_by_match_id(match_id: str) -> dict:
+    """Return a signal by match_id, or None."""
+    conn = get_conn()
+    try:
+        cur = conn.execute(
+            "SELECT id, match_id, player_a, player_b, bet_on, surface, edge, odds, result "
+            "FROM signals WHERE match_id=?", (match_id,)
+        )
+        row = cur.fetchone()
+        if row:
+            cols = [d[0] for d in cur.description]
+            return dict(zip(cols, row))
+        return None
+    except Exception:
+        conn.rollback()
+        raise

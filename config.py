@@ -9,10 +9,15 @@ TELEGRAM_ADMIN_ID  = int(os.getenv("TELEGRAM_ADMIN_ID", "0"))
 ODDS_API_KEY  = os.getenv("ODDS_API_KEY", "")
 ODDS_API_BASE = "https://api.the-odds-api.com/v4"
 
+# TheOddsAPI sport keys for tennis (ATP + WTA queried separately)
+TENNIS_SPORT_KEYS = ["tennis_atp", "tennis_wta"]
+
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
     "postgresql://postgres:password@localhost:5432/tennisedge"
 )
+
+UPI_ID = os.getenv("UPI_ID", "")
 
 EDGE_THRESHOLD = 0.07
 MIN_ODDS       = 1.40
