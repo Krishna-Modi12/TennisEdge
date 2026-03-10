@@ -292,9 +292,8 @@ async def tournament_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         return
 
     try:
-        from signals.edge_detector import odds_to_prob
+        from signals.edge_detector import odds_to_prob, calculate_true_edge
         from models.advanced_model import advanced_predict as predict
-        from config import EDGE_THRESHOLD
     except ImportError:
         pass
 
@@ -306,14 +305,13 @@ async def tournament_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             odds_text = f"   📊 Odds: {m['odds_a']:.2f} / {m['odds_b']:.2f}\n"
             try:
                 model = predict(m["player_a"], m["player_b"], m.get("surface", "hard"))
-                market_a = odds_to_prob(m["odds_a"])
-                market_b = odds_to_prob(m["odds_b"])
-                edge_a = model["prob_a"] - market_a
-                edge_b = model["prob_b"] - market_b
-                if edge_a >= EDGE_THRESHOLD:
-                    edge_text = f"   🔥 Edge: {m['player_a']} +{edge_a:.1%}\n"
-                elif edge_b >= EDGE_THRESHOLD:
-                    edge_text = f"   🔥 Edge: {m['player_b']} +{edge_b:.1%}\n"
+                # Dual validation edge for player A
+                te_a = calculate_true_edge(model["prob_a"], m["odds_a"])
+                te_b = calculate_true_edge(model["prob_b"], m["odds_b"])
+                if te_a["signal_valid"]:
+                    edge_text = f"   🔥 Edge: {m['player_a']} +{te_a['true_edge_score']:.1%} (conf {te_a['confidence']:.1f}x)\n"
+                elif te_b["signal_valid"]:
+                    edge_text = f"   🔥 Edge: {m['player_b']} +{te_b['true_edge_score']:.1%} (conf {te_b['confidence']:.1f}x)\n"
             except Exception:
                 pass
 
@@ -415,8 +413,6 @@ async def addcredits(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"❌ User {target_tid} not found. They must /start first.")
         return
 
-    # BUG FIX: add_credits_manual now returns the new balance directly,
-    # so we show the correct post-update value instead of stale pre-update data.
     new_balance = add_credits_manual(db_user["id"], amount)
     await update.message.reply_text(
         f"✅ Added {amount} credits to "
@@ -424,6 +420,38 @@ async def addcredits(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         f"New balance: *{new_balance}*",
         parse_mode="Markdown"
     )
+
+
+async def backtest_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Admin: /backtest [atp_from] [atp_to] — run historical backtest."""
+    if not is_admin(update.effective_user.id):
+        await update.message.reply_text("⛔ Admin only.")
+        return
+
+    atp_from = int(ctx.args[0]) if len(ctx.args) > 0 else 2023
+    atp_to   = int(ctx.args[1]) if len(ctx.args) > 1 else 2024
+
+    await update.message.reply_text(
+        f"📊 Running backtest ({atp_from}-{atp_to})...\n"
+        f"This may take a few minutes."
+    )
+
+    try:
+        from backtest.engine import backtest, format_backtest_report
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(
+            None,
+            lambda: backtest(atp_from=atp_from, atp_to=atp_to,
+                           wta_from=atp_from, wta_to=atp_to)
+        )
+        report = format_backtest_report(result)
+        # Split if too long
+        if len(report) > 4000:
+            report = report[:3950] + "\n\n_...truncated_"
+        await update.message.reply_text(report, parse_mode="Markdown")
+    except Exception as e:
+        logger.exception("Backtest error")
+        await update.message.reply_text(f"❌ Backtest error: {e}")
 
 
 # ── Global error handler ──────────────────────────────────────────────────────
@@ -506,6 +534,7 @@ def main():
     # Admin commands
     app.add_handler(CommandHandler("scan",       scan))
     app.add_handler(CommandHandler("addcredits", addcredits))
+    app.add_handler(CommandHandler("backtest",   backtest_cmd))
     # Callbacks
     app.add_handler(CallbackQueryHandler(buy_callback, pattern="^buy_"))
     app.add_handler(CallbackQueryHandler(tournament_callback, pattern="^tourn_"))

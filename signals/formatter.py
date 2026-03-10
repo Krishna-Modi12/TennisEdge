@@ -39,7 +39,11 @@ def format_signal(signal: dict) -> str:
 
     model_pct  = round(signal["model_prob"]  * 100, 1)
     market_pct = round(signal["market_prob"] * 100, 1)
-    edge_pct   = round(signal["edge"]        * 100, 1)
+
+    # Dual validation metrics
+    value_edge_pct = round(signal.get("value_edge", signal.get("edge", 0)) * 100, 1)
+    confidence     = signal.get("confidence", 0)
+    true_edge_pct  = round(signal.get("true_edge_score", signal.get("edge", 0)) * 100, 1)
 
     # Escape all dynamic strings that go inside Markdown formatting
     tournament = _escape(signal["tournament"])
@@ -58,12 +62,14 @@ def format_signal(signal: dict) -> str:
         f"━━━━━━━━━━━━━━━━━━━\n\n"
         f"✅ *Bet On:* {bet_on}\n"
         f"💰 *Odds:* {signal['odds']}\n\n"
-        f"📊 *Model Probability:* {model_pct}%\n"
-        f"📉 *Market Probability:* {market_pct}%\n\n"
-        f"🔥 *EDGE: +{edge_pct}%*\n\n"
+        f"📊 *Model Prob:* {model_pct}%\n"
+        f"📉 *Market Prob:* {market_pct}%\n\n"
+        f"💎 *Value Edge:* +{value_edge_pct}%\n"
+        f"🧠 *Confidence:* {confidence:.2f}x\n"
+        f"🔥 *True Edge Score: +{true_edge_pct}%*\n\n"
     )
 
-    # Add model breakdown if advanced model data is present
+    # Add 4-factor model breakdown if available
     if signal.get("data_quality") and signal["data_quality"] != "elo_only":
         elo_p   = round(signal.get("elo_prob_a", 0.5) * 100, 1)
         form_p  = round(signal.get("form_prob_a", 0.5) * 100, 1)
@@ -94,7 +100,7 @@ def format_signal_list(signals: list) -> str:
 
     lines = ["🎾 *Recent TennisEdge Signals*\n━━━━━━━━━━━━━━━━━━━\n"]
     for s in signals:
-        edge_pct      = round(s["edge"] * 100, 1)
+        true_edge = round(s.get("true_edge_score", s.get("edge", 0)) * 100, 1)
         surface_emoji = SURFACE_EMOJI.get(s["surface"], "🎾")
         ts            = s["created_at"].strftime("%d %b %H:%M") if hasattr(s["created_at"], "strftime") else ""
         player_a      = _escape(s["player_a"])
@@ -103,7 +109,7 @@ def format_signal_list(signals: list) -> str:
         lines.append(
             f"{surface_emoji} *{player_a} vs {player_b}*\n"
             f"✅ Bet: {bet_on} @ {s['odds']}\n"
-            f"🔥 Edge: +{edge_pct}%  |  {ts}\n"
+            f"🔥 True Edge: +{true_edge}%  |  {ts}\n"
         )
 
     return "\n".join(lines)

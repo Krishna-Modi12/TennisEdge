@@ -1,29 +1,52 @@
 """
 signals/edge_detector.py
-Core engine: compare model probability vs market probability → detect edges.
+Core engine: Dual Validation edge detection.
 
-BUG FIX: Wrapped each match in try/except.
-Previously, one bad match (malformed odds, DB hiccup, player name with special
-chars) would raise an uncaught exception that crashed the ENTIRE pipeline loop,
-meaning zero signals were sent even for perfectly valid matches.
+A signal fires ONLY when both conditions are met:
+  1. Value Edge ≥ 10%  (bookmaker is underpricing the player)
+  2. Model Prob ≥ 40%  (model actually backs this player)
+
+True Edge Score = Value Edge × Confidence
+where Confidence = model_prob / (1 - model_prob)
 """
 
-from config import EDGE_THRESHOLD, MIN_ODDS, MAX_ODDS
+from config import MIN_VALUE_EDGE, MIN_MODEL_PROB, MIN_ODDS, MAX_ODDS
 from models.advanced_model import advanced_predict as predict
 from database.db import signal_exists, save_signal
 
 
 def odds_to_prob(odds: float) -> float:
-    """Convert decimal odds to implied market probability (overround-naive)."""
+    """Convert decimal odds to implied market probability."""
     if odds <= 0:
         return 0.0
     return round(1.0 / odds, 4)
 
 
+def calculate_true_edge(model_prob: float, decimal_odds: float) -> dict:
+    """
+    Dual validation edge calculation.
+    Returns value_edge, confidence, true_edge_score, and whether signal is valid.
+    """
+    implied_prob = 1.0 / decimal_odds
+    value_edge = (model_prob * decimal_odds) - 1.0
+    confidence = model_prob / (1.0 - model_prob) if model_prob < 1.0 else 99.0
+    true_edge_score = value_edge * confidence
+
+    signal_valid = (value_edge >= MIN_VALUE_EDGE and model_prob >= MIN_MODEL_PROB)
+
+    return {
+        "implied_prob":    round(implied_prob, 4),
+        "value_edge":      round(value_edge, 4),
+        "confidence":      round(confidence, 3),
+        "true_edge_score": round(true_edge_score, 4),
+        "signal_valid":    signal_valid,
+    }
+
+
 def detect_edges(matches: list) -> list:
     """
-    Given a list of matches with odds, run the Elo model and detect value bets.
-    Returns list of signal dicts for matches where edge exceeds EDGE_THRESHOLD.
+    Run dual-validation edge detection on a list of matches with odds.
+    Returns list of signal dicts for matches that pass both validation gates.
     """
     signals = []
 
@@ -42,7 +65,7 @@ def detect_edges(matches: list) -> list:
 
 
 def _process_match(match: dict) -> dict:
-    """Process a single match. Returns signal dict or None."""
+    """Process a single match with dual validation. Returns signal dict or None."""
     match_id   = match["match_id"]
     player_a   = match["player_a"]
     player_b   = match["player_b"]
@@ -51,51 +74,42 @@ def _process_match(match: dict) -> dict:
     odds_a     = float(match["odds_a"])
     odds_b     = float(match["odds_b"])
 
-    # Skip if signal already sent for this match
     if signal_exists(match_id):
         return None
 
-    # Skip if BOTH sides have extreme odds — one side can still be valid
     a_in_range = MIN_ODDS <= odds_a <= MAX_ODDS
     b_in_range = MIN_ODDS <= odds_b <= MAX_ODDS
     if not a_in_range and not b_in_range:
         return None
 
-    # Model probability
+    # Model probability from 4-factor model
     model  = predict(player_a, player_b, surface)
     prob_a = model["prob_a"]
     prob_b = model["prob_b"]
 
-    # Market probability (implied from decimal odds)
-    market_a = odds_to_prob(odds_a)
-    market_b = odds_to_prob(odds_b)
+    # Dual validation for each side
+    best_signal = None
 
-    # Edge calculation
-    edge_a = round(prob_a - market_a, 4)
-    edge_b = round(prob_b - market_b, 4)
+    if a_in_range and odds_a > 0:
+        te_a = calculate_true_edge(prob_a, odds_a)
+        if te_a["signal_valid"]:
+            best_signal = {
+                "player": player_a, "odds": odds_a, "model_prob": prob_a,
+                "market_prob": te_a["implied_prob"],
+                **te_a,
+            }
 
-    best_edge   = None
-    bet_player  = None
-    bet_odds    = None
-    model_prob  = None
-    market_prob = None
+    if b_in_range and odds_b > 0:
+        te_b = calculate_true_edge(prob_b, odds_b)
+        if te_b["signal_valid"]:
+            if best_signal is None or te_b["true_edge_score"] > best_signal["true_edge_score"]:
+                best_signal = {
+                    "player": player_b, "odds": odds_b, "model_prob": prob_b,
+                    "market_prob": te_b["implied_prob"],
+                    **te_b,
+                }
 
-    if edge_a >= EDGE_THRESHOLD and a_in_range:
-        best_edge   = edge_a
-        bet_player  = player_a
-        bet_odds    = odds_a
-        model_prob  = prob_a
-        market_prob = market_a
-
-    if edge_b >= EDGE_THRESHOLD and b_in_range:
-        if best_edge is None or edge_b > best_edge:
-            best_edge   = edge_b
-            bet_player  = player_b
-            bet_odds    = odds_b
-            model_prob  = prob_b
-            market_prob = market_b
-
-    if best_edge is None:
+    if best_signal is None:
         return None
 
     signal_id = save_signal(
@@ -104,30 +118,34 @@ def _process_match(match: dict) -> dict:
         surface=surface,
         player_a=player_a,
         player_b=player_b,
-        bet_on=bet_player,
-        model_prob=model_prob,
-        market_prob=market_prob,
-        edge=best_edge,
-        odds=bet_odds,
+        bet_on=best_signal["player"],
+        model_prob=best_signal["model_prob"],
+        market_prob=best_signal["market_prob"],
+        edge=best_signal["true_edge_score"],  # store true edge score as the edge
+        odds=best_signal["odds"],
     )
 
     return {
-        "signal_id":      signal_id,
-        "match_id":       match_id,
-        "tournament":     tournament,
-        "surface":        surface,
-        "player_a":       player_a,
-        "player_b":       player_b,
-        "bet_on":         bet_player,
-        "model_prob":     model_prob,
-        "market_prob":    market_prob,
-        "edge":           best_edge,
-        "odds":           bet_odds,
-        "elo_prob_a":     model.get("elo_prob_a"),
-        "form_prob_a":    model.get("form_prob_a"),
-        "surface_prob_a": model.get("surface_prob_a"),
-        "h2h_prob_a":     model.get("h2h_prob_a"),
-        "h2h_wins_a":     model.get("h2h_wins_a", 0),
-        "h2h_wins_b":     model.get("h2h_wins_b", 0),
-        "data_quality":   model.get("data_quality", "elo_only"),
+        "signal_id":        signal_id,
+        "match_id":         match_id,
+        "tournament":       tournament,
+        "surface":          surface,
+        "player_a":         player_a,
+        "player_b":         player_b,
+        "bet_on":           best_signal["player"],
+        "model_prob":       best_signal["model_prob"],
+        "market_prob":      best_signal["market_prob"],
+        "odds":             best_signal["odds"],
+        "value_edge":       best_signal["value_edge"],
+        "confidence":       best_signal["confidence"],
+        "true_edge_score":  best_signal["true_edge_score"],
+        "edge":             best_signal["true_edge_score"],
+        # 4-factor breakdown
+        "elo_prob_a":       model.get("elo_prob_a"),
+        "form_prob_a":      model.get("form_prob_a"),
+        "surface_prob_a":   model.get("surface_prob_a"),
+        "h2h_prob_a":       model.get("h2h_prob_a"),
+        "h2h_wins_a":       model.get("h2h_wins_a", 0),
+        "h2h_wins_b":       model.get("h2h_wins_b", 0),
+        "data_quality":     model.get("data_quality", "elo_only"),
     }

@@ -19,6 +19,10 @@ EDGE_THRESHOLD = 0.07
 MIN_ODDS       = 1.40
 MAX_ODDS       = 6.00
 
+# Dual validation thresholds
+MIN_VALUE_EDGE  = 0.10   # 10% value edge minimum
+MIN_MODEL_PROB  = 0.40   # model must give ≥40% win probability
+
 CREDITS_PER_SIGNAL = 1
 
 CREDIT_PACKAGES = {
