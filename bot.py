@@ -10,28 +10,72 @@ Commands:
     /addcredits  – admin: top up credits
 """
 
-import asyncio
-import logging
+import sys
 import os
+import time
+import traceback
 import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import (
-    Application, CommandHandler, CallbackQueryHandler,
-    ContextTypes, MessageHandler, filters
-)
 
-from config import (
-    TELEGRAM_BOT_TOKEN, TELEGRAM_ADMIN_ID,
-    CREDIT_PACKAGES, MOCK_MODE
-)
-from database.db import (
-    init_schema, get_or_create_user, get_user,
-    add_credits_manual, get_recent_signals
-)
-from signals.formatter import format_signal_list
-from scheduler.job import start_scheduler, run_pipeline, set_bot, set_loop
-from models.elo_model import seed_top_players
+# ── Health-check HTTP server (must start before heavy imports) ───────────────
+
+_startup_status = "starting..."
+
+
+class _HealthHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(_startup_status.encode())
+
+    def log_message(self, *args):
+        pass
+
+
+def _start_health_server():
+    port = int(os.environ.get("PORT", 10000))
+    server = HTTPServer(("0.0.0.0", port), _HealthHandler)
+    t = threading.Thread(target=server.serve_forever, daemon=True)
+    t.start()
+    print(f"Health server listening on :{port}", flush=True)
+
+
+# Start health server immediately
+_start_health_server()
+
+print(f"Python {sys.version}", flush=True)
+print(f"DATABASE_URL set: {bool(os.environ.get('DATABASE_URL'))}", flush=True)
+print(f"BOT_TOKEN set: {bool(os.environ.get('TELEGRAM_BOT_TOKEN'))}", flush=True)
+
+# ── Heavy imports ────────────────────────────────────────────────────────────
+try:
+    _startup_status = "importing modules..."
+    import asyncio
+    import logging
+    from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+    from telegram.ext import (
+        Application, CommandHandler, CallbackQueryHandler,
+        ContextTypes, MessageHandler, filters
+    )
+    from config import (
+        TELEGRAM_BOT_TOKEN, TELEGRAM_ADMIN_ID,
+        CREDIT_PACKAGES, MOCK_MODE
+    )
+    from database.db import (
+        init_schema, get_or_create_user, get_user,
+        add_credits_manual, get_recent_signals
+    )
+    from signals.formatter import format_signal_list
+    from scheduler.job import start_scheduler, run_pipeline, set_bot, set_loop
+    from models.elo_model import seed_top_players
+    _startup_status = "imports OK"
+    print("All imports succeeded.", flush=True)
+except Exception as e:
+    tb = traceback.format_exc()
+    _startup_status = f"IMPORT ERROR:\n{tb}"
+    print(f"IMPORT ERROR:\n{tb}", flush=True)
+    while True:
+        time.sleep(60)
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -252,11 +296,7 @@ async def error_handler(update: object, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main():
-    import traceback
     global _startup_status
-
-    # Start health check HTTP server for Render
-    _start_health_server()
 
     try:
         _startup_status = "connecting to database..."
@@ -271,8 +311,6 @@ def main():
         tb = traceback.format_exc()
         _startup_status = f"FATAL: {tb}"
         print(f"FATAL: Database initialization failed:\n{tb}", flush=True)
-        # Keep process alive so health check stays accessible for debugging
-        import time
         while True:
             time.sleep(60)
 
@@ -316,26 +354,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-# ── Health-check HTTP server (keeps Render web service alive) ────────────────
-
-_startup_status = "starting"
-
-
-class _HealthHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.end_headers()
-        self.wfile.write(_startup_status.encode())
-
-    def log_message(self, *args):
-        pass  # suppress request logs
-
-
-def _start_health_server():
-    port = int(os.environ.get("PORT", 10000))
-    server = HTTPServer(("0.0.0.0", port), _HealthHandler)
-    t = threading.Thread(target=server.serve_forever, daemon=True)
-    t.start()
-    print(f"Health server listening on :{port}")
