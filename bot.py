@@ -377,6 +377,11 @@ async def predict(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 async def predict_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     """Handle match selection — run DeepSeek prediction."""
+    # Constants for AI API call
+    MODEL = "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B:fastest"
+    HF_BASE_URL = "https://router.huggingface.co/v1"
+    TIMEOUT_SECONDS = 30
+
     query = update.callback_query
     await query.answer()
 
@@ -389,135 +394,143 @@ async def predict_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     m = match_list[idx]
     await query.edit_message_text(
-        f"🤖 *Analyzing...*\n\n"
+        f"🤖 Analyzing...\n\n"
         f"⚔️ {m['player_a']} vs {m['player_b']}\n"
         f"🏟 {m.get('tournament', 'Unknown')}\n\n"
-        f"_Running DeepSeek AI model... please wait 10-15 seconds._",
-        parse_mode="Markdown",
+        f"Running DeepSeek AI model... please wait 15-30 seconds.",
     )
 
-    # Get model prediction
     try:
-        from models.advanced_model import advanced_predict as model_predict
-        result = model_predict(m["player_a"], m["player_b"], m.get("surface", "hard"))
-        prob_a = result["prob_a"]
-        prob_b = result["prob_b"]
-        data_quality = result.get("data_quality", "unknown")
-    except Exception:
-        prob_a = 0.5
-        prob_b = 0.5
-        data_quality = "elo_only"
-        result = {}
+        # Get model prediction
+        try:
+            from models.advanced_model import advanced_predict as model_predict
+            result = model_predict(m["player_a"], m["player_b"], m.get("surface", "hard"))
+            prob_a = result["prob_a"]
+            prob_b = result["prob_b"]
+            data_quality = result.get("data_quality", "unknown")
+        except Exception as ex:
+            logger.warning(f"Model predict fallback: {ex}")
+            prob_a = 0.5
+            prob_b = 0.5
+            data_quality = "elo_only"
+            result = {}
 
-    odds_a = m.get("odds_a", 0)
-    odds_b = m.get("odds_b", 0)
-    surface = m.get("surface", "hard")
+        odds_a = m.get("odds_a", 0)
+        odds_b = m.get("odds_b", 0)
+        surface = m.get("surface", "hard")
 
-    # Determine who has the edge
-    if odds_a and odds_a > 0:
-        implied_a = 1.0 / odds_a
-        edge_a = prob_a - implied_a
-    else:
-        edge_a = 0
-        implied_a = 0.5
+        # Determine who has the edge
+        if odds_a and odds_a > 0:
+            implied_a = 1.0 / odds_a
+            edge_a = prob_a - implied_a
+        else:
+            edge_a = 0
 
-    if odds_b and odds_b > 0:
-        implied_b = 1.0 / odds_b
-        edge_b = prob_b - implied_b
-    else:
-        edge_b = 0
-        implied_b = 0.5
+        if odds_b and odds_b > 0:
+            implied_b = 1.0 / odds_b
+            edge_b = prob_b - implied_b
+        else:
+            edge_b = 0
 
-    # Pick the player with the larger edge for AI analysis
-    if edge_a >= edge_b:
-        focus_player = m["player_a"]
-        focus_opponent = m["player_b"]
-        focus_prob = prob_a
-        focus_odds = odds_a if odds_a else 2.0
-        focus_edge = edge_a
-    else:
-        focus_player = m["player_b"]
-        focus_opponent = m["player_a"]
-        focus_prob = prob_b
-        focus_odds = odds_b if odds_b else 2.0
-        focus_edge = edge_b
+        # Pick the player with the larger edge for AI analysis
+        if edge_a >= edge_b:
+            focus_player = m["player_a"]
+            focus_opponent = m["player_b"]
+            focus_prob = prob_a
+            focus_odds = odds_a if odds_a else 2.0
+            focus_edge = edge_a
+        else:
+            focus_player = m["player_b"]
+            focus_opponent = m["player_a"]
+            focus_prob = prob_b
+            focus_odds = odds_b if odds_b else 2.0
+            focus_edge = edge_b
 
-    # Call DeepSeek AI
-    ai_text = ""
-    try:
-        from ai.analyzer import generate_match_analysis
-        ai_text = await generate_match_analysis(
-            player=focus_player,
-            opponent=focus_opponent,
-            surface=surface,
-            model_prob=focus_prob,
-            odds=focus_odds,
-            value_edge=focus_edge,
-            data_quality=data_quality,
-            elo_prob=result.get("elo_prob_a"),
-            form_prob=result.get("form_prob_a"),
-            surface_prob=result.get("surface_prob_a"),
-            h2h_prob=result.get("h2h_prob_a"),
+        # Call DeepSeek AI
+        ai_text = ""
+        try:
+            from ai.analyzer import generate_match_analysis
+            ai_text = await generate_match_analysis(
+                player=focus_player,
+                opponent=focus_opponent,
+                surface=surface,
+                model_prob=focus_prob,
+                odds=focus_odds,
+                value_edge=focus_edge,
+                data_quality=data_quality,
+                elo_prob=result.get("elo_prob_a"),
+                form_prob=result.get("form_prob_a"),
+                surface_prob=result.get("surface_prob_a"),
+                h2h_prob=result.get("h2h_prob_a"),
+            )
+        except Exception as e:
+            logger.warning(f"AI prediction error: {e}")
+            ai_text = f"AI analysis error: {e}"
+
+        if not ai_text:
+            ai_text = "AI analysis unavailable. Check that HF_TOKEN is set in Render environment."
+
+        # Format the response — NO Markdown to avoid crashes from player names
+        surface_emoji = {"clay": "🟤", "hard": "🔵", "grass": "🟢"}.get(surface, "🎾")
+        prob_a_pct = round(prob_a * 100, 1)
+        prob_b_pct = round(prob_b * 100, 1)
+        edge_pct = round(max(edge_a, edge_b) * 100, 1)
+
+        odds_a_str = f"{odds_a:.2f}" if odds_a else "N/A"
+        odds_b_str = f"{odds_b:.2f}" if odds_b else "N/A"
+
+        msg = (
+            f"🤖 DEEPSEEK AI PREDICTION\n"
+            f"━━━━━━━━━━━━━━━━━━━\n\n"
+            f"🏆 {m.get('tournament', 'Tournament')}\n"
+            f"⚔️ {m['player_a']} vs {m['player_b']}\n"
+            f"{surface_emoji} Surface: {surface.title()}\n\n"
+            f"📊 Model Probabilities:\n"
+            f"  {m['player_a']}: {prob_a_pct}%\n"
+            f"  {m['player_b']}: {prob_b_pct}%\n\n"
+            f"💰 Odds:\n"
+            f"  {m['player_a']}: {odds_a_str}\n"
+            f"  {m['player_b']}: {odds_b_str}\n\n"
         )
-    except Exception as e:
-        logger.warning(f"AI prediction error: {e}")
-        ai_text = "AI analysis unavailable at this time."
 
-    if not ai_text:
-        ai_text = "AI analysis unavailable — check HF_TOKEN configuration."
+        if edge_pct > 0:
+            msg += f"💎 Best Edge: {focus_player} +{edge_pct}%\n\n"
 
-    # Format the response
-    surface_emoji = {"clay": "🟤", "hard": "🔵", "grass": "🟢"}.get(surface, "🎾")
-    prob_a_pct = round(prob_a * 100, 1)
-    prob_b_pct = round(prob_b * 100, 1)
-    edge_pct = round(max(edge_a, edge_b) * 100, 1)
+        # Add model breakdown if available
+        if data_quality != "elo_only" and result:
+            elo_p = round(result.get("elo_prob_a", 0.5) * 100, 1)
+            form_p = round(result.get("form_prob_a", 0.5) * 100, 1)
+            surf_p = round(result.get("surface_prob_a", 0.5) * 100, 1)
+            h2h_p = round(result.get("h2h_prob_a", 0.5) * 100, 1)
+            msg += (
+                f"📐 Model Breakdown:\n"
+                f"  Elo (40%): {elo_p}%\n"
+                f"  Form (25%): {form_p}%\n"
+                f"  Surface (20%): {surf_p}%\n"
+                f"  H2H (15%): {h2h_p}%\n\n"
+            )
 
-    odds_a_str = f"{odds_a:.2f}" if odds_a else "N/A"
-    odds_b_str = f"{odds_b:.2f}" if odds_b else "N/A"
-
-    msg = (
-        f"🤖 *DEEPSEEK AI PREDICTION*\n"
-        f"━━━━━━━━━━━━━━━━━━━\n\n"
-        f"🏆 *{m.get('tournament', 'Tournament')}*\n"
-        f"⚔️ *{m['player_a']}* vs *{m['player_b']}*\n"
-        f"{surface_emoji} Surface: {surface.title()}\n\n"
-        f"📊 *Model Probabilities:*\n"
-        f"  {m['player_a']}: {prob_a_pct}%\n"
-        f"  {m['player_b']}: {prob_b_pct}%\n\n"
-        f"💰 *Odds:*\n"
-        f"  {m['player_a']}: {odds_a_str}\n"
-        f"  {m['player_b']}: {odds_b_str}\n\n"
-    )
-
-    if edge_pct > 0:
-        msg += f"💎 *Best Edge:* {focus_player} +{edge_pct}%\n\n"
-
-    # Add model breakdown if available
-    if data_quality != "elo_only" and result:
-        elo_p = round(result.get("elo_prob_a", 0.5) * 100, 1)
-        form_p = round(result.get("form_prob_a", 0.5) * 100, 1)
-        surf_p = round(result.get("surface_prob_a", 0.5) * 100, 1)
-        h2h_p = round(result.get("h2h_prob_a", 0.5) * 100, 1)
         msg += (
-            f"📐 *Model Breakdown:*\n"
-            f"  Elo (40%): {elo_p}%\n"
-            f"  Form (25%): {form_p}%\n"
-            f"  Surface (20%): {surf_p}%\n"
-            f"  H2H (15%): {h2h_p}%\n\n"
+            f"🤖 AI Analysis:\n"
+            f"{ai_text}\n\n"
+            f"━━━━━━━━━━━━━━━━━━━\n"
+            f"Powered by DeepSeek AI via HuggingFace"
         )
 
-    msg += (
-        f"🤖 *AI Analysis:*\n"
-        f"_{ai_text}_\n\n"
-        f"━━━━━━━━━━━━━━━━━━━\n"
-        f"_Powered by DeepSeek AI via HuggingFace_"
-    )
+        # Telegram has a 4096 char limit
+        if len(msg) > 4000:
+            msg = msg[:3950] + "\n\n...truncated"
 
-    # Telegram has a 4096 char limit
-    if len(msg) > 4000:
-        msg = msg[:3950] + "\n\n_...truncated_"
+        await query.edit_message_text(msg)
 
-    await query.edit_message_text(msg, parse_mode="Markdown")
+    except Exception as e:
+        logger.exception(f"predict_callback crashed: {e}")
+        try:
+            await query.edit_message_text(
+                f"❌ Prediction failed: {e}\n\nPlease try /predict again."
+            )
+        except Exception:
+            pass
 
 
 # ── /help ─────────────────────────────────────────────────────────────────────

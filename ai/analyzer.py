@@ -16,9 +16,9 @@ from functools import lru_cache
 
 logger = logging.getLogger(__name__)
 
-MODEL = "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B:nscale"
+MODEL = "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B:fastest"
 HF_BASE_URL = "https://router.huggingface.co/v1"
-TIMEOUT_SECONDS = 15
+TIMEOUT_SECONDS = 30
 MAX_TOKENS = 150
 
 
