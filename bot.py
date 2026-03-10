@@ -245,6 +245,52 @@ async def matches(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("📭 No upcoming matches found right now. Check back later!")
         return
 
+    # Group by tournament
+    tournaments = {}
+    for m in match_list:
+        t = m["tournament"]
+        tournaments.setdefault(t, []).append(m)
+
+    # Store in user context for callback
+    ctx.user_data["matches_by_tournament"] = tournaments
+
+    # Build inline keyboard with one button per tournament
+    buttons = []
+    for t_name, t_matches in tournaments.items():
+        label = f"🏟 {t_name} ({len(t_matches)} matches)"
+        # Use index as callback data to avoid length limits
+        buttons.append([InlineKeyboardButton(label, callback_data=f"tourn_{len(buttons)}")])
+
+    # Store tournament order
+    ctx.user_data["tournament_order"] = list(tournaments.keys())
+
+    await update.message.reply_text(
+        f"🎾 *Select a Tournament*\n\n"
+        f"Found *{len(match_list)}* upcoming matches across *{len(tournaments)}* tournaments.",
+        reply_markup=InlineKeyboardMarkup(buttons),
+        parse_mode="Markdown",
+    )
+
+
+async def tournament_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    idx = int(query.data.split("_")[1])
+    tournament_order = ctx.user_data.get("tournament_order", [])
+    matches_by_tournament = ctx.user_data.get("matches_by_tournament", {})
+
+    if idx >= len(tournament_order):
+        await query.edit_message_text("❌ Tournament not found. Try /matches again.")
+        return
+
+    t_name = tournament_order[idx]
+    t_matches = matches_by_tournament.get(t_name, [])
+
+    if not t_matches:
+        await query.edit_message_text("📭 No matches found for this tournament.")
+        return
+
     try:
         from signals.edge_detector import odds_to_prob
         from models.elo_model import predict
@@ -252,8 +298,8 @@ async def matches(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     except ImportError:
         pass
 
-    lines = ["🎾 *Upcoming Matches*\n"]
-    for i, m in enumerate(match_list[:15], 1):
+    lines = [f"🏟 *{t_name}*\n"]
+    for i, m in enumerate(t_matches, 1):
         edge_text = ""
         odds_text = ""
         if m.get("odds_a") and m.get("odds_b") and m["odds_a"] > 0 and m["odds_b"] > 0:
@@ -273,19 +319,28 @@ async def matches(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
         time_str = m.get("event_time", "")
         status = m.get("status", "")
-        status_text = f"🔴 {status}" if status and status != "Finished" else f"🕐 {time_str}" if time_str else ""
+        if status and status != "Finished":
+            status_text = f"🔴 LIVE – {status}"
+        elif time_str:
+            status_text = f"🕐 {time_str}"
+        else:
+            status_text = ""
 
         lines.append(
             f"{i}. *{m['player_a']}* vs *{m['player_b']}*\n"
-            f"   🏟 {m['tournament']}  |  🌍 {m['surface'].title()}\n"
-            f"   {status_text}\n"
+            f"   🌍 {m['surface'].title()}  |  {status_text}\n"
             f"{odds_text}"
             f"{edge_text}"
         )
-    if len(match_list) > 15:
-        lines.append(f"\n_...and {len(match_list) - 15} more matches_")
 
-    await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
+    lines.append("\n_Use /matches to see all tournaments_")
+
+    # Telegram has a 4096 char limit per message
+    text = "\n".join(lines)
+    if len(text) > 4000:
+        text = text[:3950] + "\n\n_...message truncated_"
+
+    await query.edit_message_text(text, parse_mode="Markdown")
 
 
 # ── /help ─────────────────────────────────────────────────────────────────────
@@ -439,6 +494,7 @@ def main():
     app.add_handler(CommandHandler("addcredits", addcredits))
     # Callbacks
     app.add_handler(CallbackQueryHandler(buy_callback, pattern="^buy_"))
+    app.add_handler(CallbackQueryHandler(tournament_callback, pattern="^tourn_"))
     # Global error handler
     app.add_error_handler(error_handler)
 
