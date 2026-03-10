@@ -252,11 +252,22 @@ async def error_handler(update: object, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main():
+    import traceback
+    import sys
+
     # Start health check HTTP server for Render
     _start_health_server()
 
-    init_schema()
-    seed_top_players()
+    try:
+        print("Connecting to database...", flush=True)
+        init_schema()
+        print("Database schema ready.", flush=True)
+        seed_top_players()
+        print("Elo seeding done.", flush=True)
+    except Exception:
+        traceback.print_exc()
+        print("FATAL: Database initialization failed. Exiting.", flush=True)
+        sys.exit(1)
 
     if MOCK_MODE:
         print("⚠️  MOCK_MODE=true — using fake match data.")

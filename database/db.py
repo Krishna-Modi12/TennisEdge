@@ -219,7 +219,7 @@ def get_user(telegram_id: int) -> dict:
         raise
 
 def add_credits_manual(user_id: int, credits: int):
-    """Admin command – add credits without payment."""
+    """Admin command – add credits without payment. Returns new balance."""
     conn = get_conn()
     try:
         conn.execute("UPDATE users SET credits = credits + %s WHERE id = %s", (credits, user_id))
@@ -228,7 +228,10 @@ def add_credits_manual(user_id: int, credits: int):
             "VALUES (%s, %s, 0, 'manual', 'manual')",
             (user_id, credits),
         )
+        cur = conn.execute("SELECT credits FROM users WHERE id = %s", (user_id,))
+        row = cur.fetchone()
         conn.commit()
+        return row[0] if row else 0
     except Exception:
         conn.rollback()
         raise
