@@ -419,7 +419,9 @@ def get_signal_accuracy() -> dict:
             JOIN signals s ON r.signal_id = s.id
         """)
         r = cur.fetchone()
-        total, wins, losses = r[0], r[1] or 0, r[2] or 0
+        # Fallbacks to `0` instead of `None` in case the table has zero completed signal_results resulting in NULL SUMs out of postgres
+        total = r[0] or 0
+        wins, losses = r[1] or 0, r[2] or 0
         total_profit = r[3] or 0.0
         avg_odds = r[4] or 0.0
         

@@ -223,8 +223,9 @@ async def signals(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⏳ Scanning for edges...")
         try:
             from signals.edge_detector import detect_edges
-            match_list = fetch_odds()
-            detected = detect_edges(match_list)
+            loop = asyncio.get_running_loop()
+            match_list = await loop.run_in_executor(None, fetch_odds)
+            detected = await loop.run_in_executor(None, detect_edges, match_list)
             if detected:
                 recent = get_recent_signals(limit=5)
         except Exception as e:
