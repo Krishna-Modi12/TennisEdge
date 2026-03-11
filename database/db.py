@@ -5,6 +5,7 @@ Thread-safe via per-thread connections with psycopg2.
 """
 
 import logging
+import re
 import threading
 import psycopg2
 import psycopg2.extras
@@ -183,6 +184,11 @@ _SCHEMA_STATEMENTS = [
         wins_b        INTEGER DEFAULT 0,
         updated_at    TIMESTAMP DEFAULT NOW(),
         UNIQUE(player_a, player_b, surface)
+    )""",
+    """CREATE TABLE IF NOT EXISTS unmatched_players (
+        id         SERIAL PRIMARY KEY,
+        name       TEXT UNIQUE NOT NULL,
+        first_seen TIMESTAMP DEFAULT NOW()
     )""",
 ]
 
@@ -535,7 +541,12 @@ def get_signal_by_id(signal_id: int) -> dict:
 # ── Player name resolution ────────────────────────────────────────────────────
 
 def resolve_player_name(name: str) -> str:
-    """Normalize name, then check alias table for a canonical mapping."""
+    """Normalize name, then check alias table for a canonical mapping.
+    Also tries variants to match existing players in DB.
+    Falls back to fuzzy last-name matching if variants fail."""
+    from utils import get_name_variants, extract_last_name
+    
+    # 1. Try aliases first
     canonical = normalize_player_name(name)
     conn = get_conn()
     try:
@@ -544,9 +555,118 @@ def resolve_player_name(name: str) -> str:
             (canonical,),
         )
         r = cur.fetchone()
-        return r[0] if r else canonical
+        if r:
+            return r[0]
     except Exception:
-        return canonical
+        pass
+
+    # 2. Try variants in player_elo or player_stats to see if they exist
+    variants = get_name_variants(name)
+    for v in variants:
+        try:
+            # Check if this variant exists in any major table
+            cur = conn.execute(
+                "SELECT player_name FROM player_elo WHERE player_name = %s LIMIT 1",
+                (v,)
+            )
+            if cur.fetchone():
+                # Auto-create alias for future fast lookups
+                if v != canonical:
+                    try:
+                        conn.execute(
+                            "INSERT INTO player_aliases (alias, canonical_name) VALUES (%s, %s) "
+                            "ON CONFLICT (alias) DO NOTHING",
+                            (canonical, v),
+                        )
+                        conn.commit()
+                    except Exception:
+                        conn.rollback()
+                return v
+            
+            cur = conn.execute(
+                "SELECT player_name FROM player_stats WHERE player_name = %s LIMIT 1",
+                (v,)
+            )
+            if cur.fetchone():
+                if v != canonical:
+                    try:
+                        conn.execute(
+                            "INSERT INTO player_aliases (alias, canonical_name) VALUES (%s, %s) "
+                            "ON CONFLICT (alias) DO NOTHING",
+                            (canonical, v),
+                        )
+                        conn.commit()
+                    except Exception:
+                        conn.rollback()
+                return v
+        except Exception:
+            continue
+
+    # 3. Fuzzy last-name fallback: extract last name and search with LIKE
+    last_name = extract_last_name(name)
+    if last_name and len(last_name) >= 3:
+        try:
+            # Search player_elo for names containing this last name
+            cur = conn.execute(
+                "SELECT DISTINCT player_name FROM player_elo "
+                "WHERE player_name ILIKE %s ORDER BY matches_played DESC LIMIT 5",
+                (f"%{last_name}%",),
+            )
+            candidates = [r[0] for r in cur.fetchall()]
+            if candidates:
+                # If exactly one match, use it
+                if len(candidates) == 1:
+                    found = candidates[0]
+                    logger.info(f"[NameResolve] Fuzzy matched '{name}' → '{found}'")
+                    try:
+                        conn.execute(
+                            "INSERT INTO player_aliases (alias, canonical_name) VALUES (%s, %s) "
+                            "ON CONFLICT (alias) DO NOTHING",
+                            (canonical, found),
+                        )
+                        conn.commit()
+                    except Exception:
+                        conn.rollback()
+                    return found
+                # Multiple candidates: try to narrow by initial
+                m_init = re.match(r"^([A-Z])\.", canonical)
+                if m_init:
+                    initial = m_init.group(1)
+                    for c in candidates:
+                        # Check if candidate's first letter matches the initial
+                        c_first = c.strip().split()[0] if c.strip() else ""
+                        if c_first and c_first[0].upper() == initial.upper():
+                            logger.info(f"[NameResolve] Fuzzy+initial matched '{name}' → '{c}'")
+                            try:
+                                conn.execute(
+                                    "INSERT INTO player_aliases (alias, canonical_name) VALUES (%s, %s) "
+                                    "ON CONFLICT (alias) DO NOTHING",
+                                    (canonical, c),
+                                )
+                                conn.commit()
+                            except Exception:
+                                conn.rollback()
+                            return c
+                # Still multiple: try first candidate (most matches played)
+                if candidates:
+                    found = candidates[0]
+                    logger.info(f"[NameResolve] Fuzzy best-guess matched '{name}' → '{found}'")
+                    try:
+                        conn.execute(
+                            "INSERT INTO player_aliases (alias, canonical_name) VALUES (%s, %s) "
+                            "ON CONFLICT (alias) DO NOTHING",
+                            (canonical, found),
+                        )
+                        conn.commit()
+                    except Exception:
+                        conn.rollback()
+                    return found
+        except Exception as e:
+            logger.warning(f"[NameResolve] Fuzzy search error for '{name}': {e}")
+
+    # 4. No match found - record as unmatched and return normalized
+    record_unmatched_player(name)
+    return canonical
 
 
 def add_player_alias(alias: str, canonical_name: str):
@@ -880,6 +1000,36 @@ def get_signal_by_match_id(match_id: str) -> dict:
             cols = [d[0] for d in cur.description]
             return dict(zip(cols, row))
         return None
+    except Exception:
+        conn.rollback()
+        raise
+
+
+def record_unmatched_player(name: str):
+    """Log a player name that couldn't be matched in the DB."""
+    conn = get_conn()
+    try:
+        conn.execute(
+            "INSERT INTO unmatched_players (name) VALUES (%s) "
+            "ON CONFLICT (name) DO UPDATE SET first_seen = NOW()",
+            (name,)
+        )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+
+
+def get_unmatched_players(limit: int = 10) -> list:
+    """Return top N recently seen unmatched player names."""
+    conn = get_conn()
+    try:
+        cur = conn.execute(
+            "SELECT name, first_seen FROM unmatched_players "
+            "ORDER BY first_seen DESC LIMIT %s",
+            (limit,)
+        )
+        return [{"name": r[0], "first_seen": r[1]} for r in cur.fetchall()]
     except Exception:
         conn.rollback()
         raise

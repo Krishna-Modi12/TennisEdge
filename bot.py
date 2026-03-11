@@ -10,6 +10,7 @@ Commands:
     /scan        – admin: run pipeline manually
     /addcredits  – admin: top up credits
     /broadcastbeta – admin: invite all users to beta channel
+    /unmatched   – admin: show recently seen unmatched players
 """
 
 import sys
@@ -80,11 +81,12 @@ try:
         init_schema, get_or_create_user, get_user,
         add_credits_manual, get_recent_signals,
         get_all_user_telegram_ids, deduct_credit_atomic,
+        get_unmatched_players, add_player_alias,
     )
     print("  database.db OK", flush=True)
 
     _startup_status = "import: signals.formatter"
-    from signals.formatter import format_signal_list, format_match_card
+    from signals.formatter import format_signal_list, format_match_card, _escape
     print("  signals.formatter OK", flush=True)
 
     _startup_status = "import: integrations.tennis_api"
@@ -372,9 +374,8 @@ async def tournament_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     try:
         from signals.edge_detector import odds_to_prob, calculate_true_edge
         from models.advanced_model import advanced_predict as predict
-        from signals.formatter import _escape
     except ImportError:
-        _escape = lambda x: x
+        pass
 
     safe_t_name = _escape(t_name)
     lines = [f"🏟 *{safe_t_name}*\n"]
@@ -570,19 +571,12 @@ async def predict_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             ai_text = "AI analysis is currently disabled (HF_TOKEN missing)." if not hf_set else "AI service busy."
 
         # Format Final Result
-        surface_emoji = {"clay": "🟤", "hard": "🔵", "grass": "🟢"}.get(surface, "🎾")
+        card = format_match_card(m, res)
         
         msg = (
             f"🤖 *AI Match Prediction*\n"
             f"━━━━━━━━━━━━━━━━━━━\n\n"
-            f"⚔️ *{m['player_a']} vs {m['player_b']}*\n"
-            f"🏟 {m.get('tournament', 'Unknown')} | {surface_emoji} {surface.title()}\n\n"
-            f"📈 *Winning Probabilities:*\n"
-            f"• {m['player_a']}: {round(prob_a*100, 1)}%\n"
-            f"• {m['player_b']}: {round(prob_b*100, 1)}%\n\n"
-            f"🔥 *Focus:* {focus_player}\n"
-            f"💰 *Market Odds:* {focus_odds if focus_odds > 0 else 'N/A'}\n"
-            f"💎 *Estimated Edge:* {round(focus_edge*100, 1)}%\n\n"
+            f"{card}\n\n"
             f"📋 *Model Rationale:*\n"
             f"_{ai_text}_\n\n"
             f"━━━━━━━━━━━━━━━━━━━\n"
@@ -632,10 +626,13 @@ async def menu_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             signals = []
 
         if not signals:
+            match_count = len(match_list) if match_list else 0
             await query.edit_message_text(
                 "🔥 *Top Value Bets Today*\n\n"
-                "No high-value signals right now.\n"
-                "Check back later!",
+                f"Scanned {match_count} matches — no edges found "
+                "meeting our thresholds right now.\n\n"
+                "Signals require ≥4% value edge AND ≥35% model probability.\n"
+                "Check back closer to match time when odds sharpen!",
                 parse_mode="Markdown",
                 reply_markup=InlineKeyboardMarkup([
                     [
@@ -703,10 +700,19 @@ async def menu_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         ctx.user_data["tg_matches"] = tg_matches
 
         if not tg_matches:
+            match_count = len(match_list) if match_list else 0
             await query.edit_message_text(
-                "📊 Serve stats loading.\nCheck back soon!",
+                "📊 *Total Games Market*\n\n"
+                f"Found {match_count} upcoming matches but serve statistics "
+                "are not available yet for any of them.\n\n"
+                "This requires live serve data from the stats API.\n"
+                "Try again closer to match time!",
+                parse_mode="Markdown",
                 reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("🏠 Home", callback_data="menu_home")]
+                    [
+                        InlineKeyboardButton("🔄 Refresh", callback_data="menu_tgames"),
+                        InlineKeyboardButton("🏠 Home", callback_data="menu_home"),
+                    ]
                 ]),
             )
             return
@@ -936,7 +942,6 @@ async def full_ana_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     try:
         from models.advanced_model import advanced_predict as model_predict
-        from signals.formatter import _escape
 
         surface = m.get("surface", "hard")
         model = model_predict(m["player_a"], m["player_b"], surface)
@@ -1104,7 +1109,6 @@ async def tgames_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     else:
         rec = "⚪ Skip: No clear edge"
 
-    from signals.formatter import _escape
     text = (
         f"📊 *{_escape(m['player_a'])} vs {_escape(m['player_b'])}*\n\n"
         f"*Total Games Market:*\n"
@@ -1348,6 +1352,58 @@ async def broadcastbeta(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     )
 
 
+async def unmatched_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Admin: /unmatched — show top 10 unmatched player names."""
+    if not is_admin(update.effective_user.id):
+        await update.message.reply_text("⛔ Admin only.")
+        return
+
+    unmatched = get_unmatched_players(limit=10)
+    if not unmatched:
+        await update.message.reply_text("✅ No unmatched players recorded.")
+        return
+
+    lines = ["🔍 *Recently Seen Unmatched Players:*", ""]
+    for i, p in enumerate(unmatched, 1):
+        ts = p["first_seen"].strftime("%d %b %H:%M") if hasattr(p["first_seen"], "strftime") else str(p["first_seen"])
+        lines.append(f"{i}. `{p['name']}` (Seen: {ts})")
+    
+    lines.append("\nUse `/alias <old_name> | <canonical_name>` to fix.")
+    await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
+
+
+async def alias_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Admin: /alias <old_name> | <canonical_name> — map a player name alias."""
+    if not is_admin(update.effective_user.id):
+        await update.message.reply_text("⛔ Admin only.")
+        return
+
+    text = " ".join(ctx.args).strip() if ctx.args else ""
+    if "|" not in text:
+        await update.message.reply_text(
+            "Usage: `/alias old name | canonical name`\n"
+            "Example: `/alias N. Djokovic | Novak Djokovic`",
+            parse_mode="Markdown",
+        )
+        return
+
+    parts = text.split("|", 1)
+    alias_name = parts[0].strip()
+    canonical = parts[1].strip()
+    if not alias_name or not canonical:
+        await update.message.reply_text("Both names are required.")
+        return
+
+    try:
+        add_player_alias(alias_name, canonical)
+        await update.message.reply_text(
+            f"✅ Alias added:\n`{alias_name}` → `{canonical}`",
+            parse_mode="Markdown",
+        )
+    except Exception as e:
+        await update.message.reply_text(f"❌ Error: {e}")
+
+
 async def backtest_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     """Admin: /backtest [atp_from] [atp_to] — run Pinnacle+Elo backtest."""
     if not is_admin(update.effective_user.id):
@@ -1473,6 +1529,8 @@ def main():
     app.add_handler(CommandHandler("addcredits", addcredits))
     app.add_handler(CommandHandler("broadcastbeta", broadcastbeta))
     app.add_handler(CommandHandler("backtest",   backtest_cmd))
+    app.add_handler(CommandHandler("unmatched",  unmatched_cmd))
+    app.add_handler(CommandHandler("alias",      alias_cmd))
     # Callbacks
     app.add_handler(CallbackQueryHandler(buy_callback, pattern="^buy_"))
     app.add_handler(CallbackQueryHandler(tournament_callback, pattern="^tourn_"))
