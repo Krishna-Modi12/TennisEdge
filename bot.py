@@ -473,32 +473,32 @@ async def predict_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                 ai_text = "AI model did not return a response. The service may be temporarily busy."
 
         # Format the response
-        surface_emoji = {"clay": "\ud83d\udfe4", "hard": "\ud83d\udd35", "grass": "\ud83d\udfe2"}.get(surface, "\ud83c\udfbe")
+        surface_emoji = {"clay": "🟤", "hard": "🔵", "grass": "🟢"}.get(surface, "🎾")
         prob_a_pct = round(prob_a * 100, 1)
         prob_b_pct = round(prob_b * 100, 1)
 
         msg = (
-            f"\ud83e\udd16 DEEPSEEK AI PREDICTION\n"
-            f"\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\n"
-            f"\ud83c\udfc6 {m.get('tournament', 'Tournament')}\n"
-            f"\u2694\ufe0f {m['player_a']} vs {m['player_b']}\n"
+            f"🤖 DEEPSEEK AI PREDICTION\n"
+            f"━━━━━━━━━━━━━━━━━━━\n\n"
+            f"🏆 {m.get('tournament', 'Tournament')}\n"
+            f"⚔️ {m['player_a']} vs {m['player_b']}\n"
             f"{surface_emoji} Surface: {surface.title()}\n\n"
-            f"\ud83d\udcca Model Probabilities:\n"
+            f"📊 Model Probabilities:\n"
             f"  {m['player_a']}: {prob_a_pct}%\n"
             f"  {m['player_b']}: {prob_b_pct}%\n\n"
         )
 
         if has_odds:
             msg += (
-                f"\ud83d\udcb0 Odds:\n"
+                f"💰 Odds:\n"
                 f"  {m['player_a']}: {odds_a:.2f}\n"
                 f"  {m['player_b']}: {odds_b:.2f}\n\n"
             )
             edge_pct = round(max(edge_a, edge_b) * 100, 1)
             if edge_pct > 0:
-                msg += f"\ud83d\udc8e Best Edge: {focus_player} +{edge_pct}%\n\n"
+                msg += f"💎 Best Edge: {focus_player} +{edge_pct}%\n\n"
         else:
-            msg += "\ud83d\udcb0 Odds: Not yet available for this match\n\n"
+            msg += "💰 Odds: Not yet available for this match\n\n"
 
         # Add model breakdown if available
         if data_quality != "elo_only" and result:
@@ -507,19 +507,19 @@ async def predict_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             surf_p = round(result.get("surface_prob_a", 0.5) * 100, 1)
             h2h_p = round(result.get("h2h_prob_a", 0.5) * 100, 1)
             msg += (
-                f"\ud83d\udcd0 Model Breakdown:\n"
+                f"📐 Model Breakdown:\n"
                 f"  Elo (40%): {elo_p}%\n"
                 f"  Form (25%): {form_p}%\n"
                 f"  Surface (20%): {surf_p}%\n"
                 f"  H2H (15%): {h2h_p}%\n\n"
             )
         elif prob_a == 0.5 and prob_b == 0.5:
-            msg += "\u26a0\ufe0f Players not in database \u2014 model defaulted to 50/50\n\n"
+            msg += "⚠️ Players not in database — model defaulted to 50/50\n\n"
 
         msg += (
-            f"\ud83e\udd16 AI Analysis:\n"
+            f"🤖 AI Analysis:\n"
             f"{ai_text}\n\n"
-            f"\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n"
+            f"━━━━━━━━━━━━━━━━━━━\n"
             f"Powered by DeepSeek AI via HuggingFace"
         )
 
