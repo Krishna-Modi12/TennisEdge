@@ -254,3 +254,115 @@ psycopg2.OperationalError: connection to server at "localhost" (::1), port 5432 
 connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
 	Is the server running on that host and accepting TCP/IP connections?
 
+2026-03-11 19:18:29,038 ERROR cache_get_failed: could not translate host name "dpg-d6nph71aae7s738itdp0-a" to address: Name or service not known
+Traceback (most recent call last):
+  File "C:\Users\krish\OneDrive\Desktop\BOT\TennisEdge-New\integrations\tennis_api.py", line 88, in _cache_get
+    conn = get_conn()
+  File "C:\Users\krish\OneDrive\Desktop\BOT\TennisEdge-New\database\db.py", line 60, in get_conn
+    raw = psycopg2.connect(DATABASE_URL)
+  File "C:\Users\krish\AppData\Local\Programs\Python\Python310\lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: could not translate host name "dpg-d6nph71aae7s738itdp0-a" to address: Name or service not known
+
+2026-03-11 19:18:29,881 ERROR search_player_failed: could not translate host name "dpg-d6nph71aae7s738itdp0-a" to address: Name or service not known
+Traceback (most recent call last):
+  File "C:\Users\krish\OneDrive\Desktop\BOT\TennisEdge-New\integrations\tennis_api.py", line 918, in search_player
+    conn = get_conn()
+  File "C:\Users\krish\OneDrive\Desktop\BOT\TennisEdge-New\database\db.py", line 60, in get_conn
+    raw = psycopg2.connect(DATABASE_URL)
+  File "C:\Users\krish\AppData\Local\Programs\Python\Python310\lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: could not translate host name "dpg-d6nph71aae7s738itdp0-a" to address: Name or service not known
+
+2026-03-11 19:18:30,723 ERROR cache_get_failed: could not translate host name "dpg-d6nph71aae7s738itdp0-a" to address: Name or service not known
+Traceback (most recent call last):
+  File "C:\Users\krish\OneDrive\Desktop\BOT\TennisEdge-New\integrations\tennis_api.py", line 88, in _cache_get
+    conn = get_conn()
+  File "C:\Users\krish\OneDrive\Desktop\BOT\TennisEdge-New\database\db.py", line 60, in get_conn
+    raw = psycopg2.connect(DATABASE_URL)
+  File "C:\Users\krish\AppData\Local\Programs\Python\Python310\lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: could not translate host name "dpg-d6nph71aae7s738itdp0-a" to address: Name or service not known
+
+2026-03-11 19:18:31,570 ERROR cache_get_failed: could not translate host name "dpg-d6nph71aae7s738itdp0-a" to address: Name or service not known
+Traceback (most recent call last):
+  File "C:\Users\krish\OneDrive\Desktop\BOT\TennisEdge-New\integrations\tennis_api.py", line 88, in _cache_get
+    conn = get_conn()
+  File "C:\Users\krish\OneDrive\Desktop\BOT\TennisEdge-New\database\db.py", line 60, in get_conn
+    raw = psycopg2.connect(DATABASE_URL)
+  File "C:\Users\krish\AppData\Local\Programs\Python\Python310\lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: could not translate host name "dpg-d6nph71aae7s738itdp0-a" to address: Name or service not known
+
+2026-03-11 19:18:32,416 ERROR cache_get_failed: could not translate host name "dpg-d6nph71aae7s738itdp0-a" to address: Name or service not known
+Traceback (most recent call last):
+  File "C:\Users\krish\OneDrive\Desktop\BOT\TennisEdge-New\integrations\tennis_api.py", line 88, in _cache_get
+    conn = get_conn()
+  File "C:\Users\krish\OneDrive\Desktop\BOT\TennisEdge-New\database\db.py", line 60, in get_conn
+    raw = psycopg2.connect(DATABASE_URL)
+  File "C:\Users\krish\AppData\Local\Programs\Python\Python310\lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: could not translate host name "dpg-d6nph71aae7s738itdp0-a" to address: Name or service not known
+
+2026-03-11 19:18:33,265 ERROR search_player_failed: could not translate host name "dpg-d6nph71aae7s738itdp0-a" to address: Name or service not known
+Traceback (most recent call last):
+  File "C:\Users\krish\OneDrive\Desktop\BOT\TennisEdge-New\integrations\tennis_api.py", line 918, in search_player
+    conn = get_conn()
+  File "C:\Users\krish\OneDrive\Desktop\BOT\TennisEdge-New\database\db.py", line 60, in get_conn
+    raw = psycopg2.connect(DATABASE_URL)
+  File "C:\Users\krish\AppData\Local\Programs\Python\Python310\lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: could not translate host name "dpg-d6nph71aae7s738itdp0-a" to address: Name or service not known
+
+2026-03-11 19:18:34,103 ERROR cache_get_failed: could not translate host name "dpg-d6nph71aae7s738itdp0-a" to address: Name or service not known
+Traceback (most recent call last):
+  File "C:\Users\krish\OneDrive\Desktop\BOT\TennisEdge-New\integrations\tennis_api.py", line 88, in _cache_get
+    conn = get_conn()
+  File "C:\Users\krish\OneDrive\Desktop\BOT\TennisEdge-New\database\db.py", line 60, in get_conn
+    raw = psycopg2.connect(DATABASE_URL)
+  File "C:\Users\krish\AppData\Local\Programs\Python\Python310\lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: could not translate host name "dpg-d6nph71aae7s738itdp0-a" to address: Name or service not known
+
+2026-03-11 19:18:34,961 ERROR cache_get_failed: could not translate host name "dpg-d6nph71aae7s738itdp0-a" to address: Name or service not known
+Traceback (most recent call last):
+  File "C:\Users\krish\OneDrive\Desktop\BOT\TennisEdge-New\integrations\tennis_api.py", line 88, in _cache_get
+    conn = get_conn()
+  File "C:\Users\krish\OneDrive\Desktop\BOT\TennisEdge-New\database\db.py", line 60, in get_conn
+    raw = psycopg2.connect(DATABASE_URL)
+  File "C:\Users\krish\AppData\Local\Programs\Python\Python310\lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: could not translate host name "dpg-d6nph71aae7s738itdp0-a" to address: Name or service not known
+
+2026-03-11 19:18:35,803 ERROR cache_get_failed: could not translate host name "dpg-d6nph71aae7s738itdp0-a" to address: Name or service not known
+Traceback (most recent call last):
+  File "C:\Users\krish\OneDrive\Desktop\BOT\TennisEdge-New\integrations\tennis_api.py", line 88, in _cache_get
+    conn = get_conn()
+  File "C:\Users\krish\OneDrive\Desktop\BOT\TennisEdge-New\database\db.py", line 60, in get_conn
+    raw = psycopg2.connect(DATABASE_URL)
+  File "C:\Users\krish\AppData\Local\Programs\Python\Python310\lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: could not translate host name "dpg-d6nph71aae7s738itdp0-a" to address: Name or service not known
+
+2026-03-11 19:18:36,646 ERROR search_player_failed: could not translate host name "dpg-d6nph71aae7s738itdp0-a" to address: Name or service not known
+Traceback (most recent call last):
+  File "C:\Users\krish\OneDrive\Desktop\BOT\TennisEdge-New\integrations\tennis_api.py", line 918, in search_player
+    conn = get_conn()
+  File "C:\Users\krish\OneDrive\Desktop\BOT\TennisEdge-New\database\db.py", line 60, in get_conn
+    raw = psycopg2.connect(DATABASE_URL)
+  File "C:\Users\krish\AppData\Local\Programs\Python\Python310\lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: could not translate host name "dpg-d6nph71aae7s738itdp0-a" to address: Name or service not known
+
+2026-03-11 19:23:42,102 INFO api_non_200 path=/api/tennis/search/Novak Djokovic status=403
+2026-03-11 19:23:45,327 INFO api_non_200 path=/api/tennis/search/Novak%20Djokovic status=403
+2026-03-11 19:23:48,634 INFO api_non_200 path=/api/tennis/rankings/atp status=403
+2026-03-11 19:23:52,206 INFO api_non_200 path=/api/tennis/rankings/wta status=403
+2026-03-11 19:23:55,420 INFO api_non_200 path=/api/tennis/events/live status=403
+2026-03-11 19:23:58,672 INFO api_non_200 path=/api/tennis/events/today status=403
+2026-03-11 19:24:02,584 INFO api_non_200 path=/api/tennis/search/Novak Djokovic status=403
+2026-03-11 19:24:05,846 INFO api_non_200 path=/api/tennis/search/Novak%20Djokovic status=403
+2026-03-11 19:24:09,299 INFO api_non_200 path=/api/tennis/rankings/atp status=403
+2026-03-11 19:24:13,076 INFO api_non_200 path=/api/tennis/rankings/wta status=403
+2026-03-11 19:24:16,491 INFO api_non_200 path=/api/tennis/events/live status=403
+2026-03-11 19:24:20,117 INFO api_non_200 path=/api/tennis/events/today status=403

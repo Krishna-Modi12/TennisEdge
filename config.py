@@ -7,6 +7,9 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_ADMIN_ID  = int(os.getenv("TELEGRAM_ADMIN_ID", "0"))
 
 ODDS_API_KEY  = os.getenv("ODDS_API_KEY", "")
+RAPIDAPI_KEY  = os.getenv("RAPIDAPI_KEY", "")
+RAPIDAPI_HOST = os.getenv("RAPIDAPI_HOST", "tennis-api-atp-wta-itf.p.rapidapi.com")
+HF_TOKEN      = os.getenv("HF_TOKEN", "")
 
 DATABASE_URL = os.getenv(
     "DATABASE_URL",

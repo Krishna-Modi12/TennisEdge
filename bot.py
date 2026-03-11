@@ -686,8 +686,9 @@ async def menu_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
         tg_matches = []
         for m in match_list:
-            stats_a = get_player_stats(m["player_a"])
-            stats_b = get_player_stats(m["player_b"])
+            surface = m.get("surface", "hard")
+            stats_a = get_player_stats(m["player_a"], surface)
+            stats_b = get_player_stats(m["player_b"], surface)
             if stats_a and stats_b:
                 probs = total_games_probability(
                     stats_a.get("first_serve_won_pct"),
@@ -851,12 +852,16 @@ async def match_sel_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     try:
         from models.advanced_model import advanced_predict as model_predict
-        model = model_predict(m["player_a"], m["player_b"], m.get("surface", "hard"))
-        bet_player = (
-            m["player_a"] if model.get("prob_a", 0.5) >= model.get("prob_b", 0.5)
-            else m["player_b"]
-        )
-        api_stats = get_player_stats(bet_player)
+        surface = m.get("surface", "hard")
+        model = model_predict(m["player_a"], m["player_b"], surface)
+        
+        # Determine bet player based on model probability
+        if model.get("prob_a", 0.5) >= model.get("prob_b", 0.5):
+            bet_player = m["player_a"]
+        else:
+            bet_player = m["player_b"]
+            
+        api_stats = get_player_stats(bet_player, surface)
         card = format_match_card(m, model, api_stats)
     except Exception as e:
         logger.error(f"match_sel_callback error: {e}")
@@ -933,23 +938,42 @@ async def full_ana_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         from models.advanced_model import advanced_predict as model_predict
         from signals.formatter import _escape
 
-        model = model_predict(m["player_a"], m["player_b"], m.get("surface", "hard"))
-        bet_player = (
-            m["player_a"] if model.get("prob_a", 0.5) >= model.get("prob_b", 0.5)
-            else m["player_b"]
-        )
-        api_stats = get_player_stats(bet_player)
+        surface = m.get("surface", "hard")
+        model = model_predict(m["player_a"], m["player_b"], surface)
+        
+        # Determine bet player and mapping
+        if model.get("prob_a", 0.5) >= model.get("prob_b", 0.5):
+            bet_player = m["player_a"]
+            is_a = True
+        else:
+            bet_player = m["player_b"]
+            is_a = False
+            
+        api_stats = get_player_stats(bet_player, surface)
         h2h = get_h2h_stats(m["player_a"], m["player_b"])
         form = get_current_tournament_form(bet_player)
         ranking = get_player_ranking(bet_player)
         card = format_match_card(m, model, api_stats)
 
         lines = [card, "", "📋 *Full Analysis:*"]
+        
+        # Flip factors if betting on Player B
+        if is_a:
+            p_elo   = model.get('elo_prob_a', 0.5)
+            p_form  = model.get('form_prob_a', 0.5)
+            p_surf  = model.get('surface_prob_a', 0.5)
+            p_h2h   = model.get('h2h_prob_a', 0.5)
+        else:
+            p_elo   = 1.0 - model.get('elo_prob_a', 0.5)
+            p_form  = 1.0 - model.get('form_prob_a', 0.5)
+            p_surf  = 1.0 - model.get('surface_prob_a', 0.5)
+            p_h2h   = 1.0 - model.get('h2h_prob_a', 0.5)
+
         lines += [
-            f"Elo (40%): {format_prob(model.get('elo_prob_a'))}",
-            f"Form (25%): {format_prob(model.get('form_prob_a'))}",
-            f"Surface (20%): {format_prob(model.get('surface_prob_a'))}",
-            f"H2H (15%): {format_prob(model.get('h2h_prob_a'))}",
+            f"Elo Rating (40%): {format_prob(p_elo)}",
+            f"Recent Form (25%): {format_prob(p_form)}",
+            f"Surface Stat (20%): {format_prob(p_surf)}",
+            f"H2H Record (15%): {format_prob(p_h2h)}",
         ]
 
         if h2h:
@@ -1013,20 +1037,28 @@ async def vbets_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         return
 
     s = top5[idx]
+    surface = s.get("surface", "hard")
+    
+    # Construct match dict correctly for format_match_card
+    # We must ensure prob_a/odds_a correspond to the same side.
     match = {
-        "player_a": s.get("player_a", ""),
-        "player_b": s.get("player_b", ""),
-        "surface": s.get("surface", "hard"),
-        "tournament": s.get("tournament", ""),
-        "odds_a": s.get("odds", 0),
-        "odds_b": s.get("odds", 0),
+        "player_a": s.get("player_a", "Player A"),
+        "player_b": s.get("player_b", "Player B"),
+        "surface":  surface,
+        "tournament": s.get("tournament", "Unknown"),
+        "odds_a": s.get("odds", 0) if s.get("bet_on") == s.get("player_a") else 0,
+        "odds_b": s.get("odds", 0) if s.get("bet_on") == s.get("player_b") else 0,
     }
+    
+    # Map the probabilities back to Player A/B for format_match_card
+    is_bet_on_a = (s.get("bet_on") == s.get("player_a"))
     model = {
-        "prob_a": s.get("model_prob", 0.5),
-        "prob_b": 1 - s.get("model_prob", 0.5),
+        "prob_a": s.get("model_prob") if is_bet_on_a else (1.0 - s.get("model_prob", 0.5)),
+        "prob_b": s.get("model_prob") if not is_bet_on_a else (1.0 - s.get("model_prob", 0.5)),
         "true_edge_score": s.get("true_edge_score", s.get("edge", 0)),
     }
-    api_stats = get_player_stats(s.get("bet_on", ""))
+    
+    api_stats = get_player_stats(s.get("bet_on", ""), surface)
     card = format_match_card(match, model, api_stats)
     await query.edit_message_text(
         card,
@@ -1060,6 +1092,7 @@ async def tgames_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     item = tg_matches[idx]
     m = item["match"]
+    surface = m.get("surface", "hard")
     probs = item["probs"]
     over_pct = round(probs["over"] * 100, 0)
     under_pct = round(probs["under"] * 100, 0)

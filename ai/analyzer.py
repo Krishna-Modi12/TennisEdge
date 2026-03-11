@@ -13,6 +13,7 @@ import os
 import asyncio
 import logging
 from functools import lru_cache
+from config import HF_TOKEN
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +32,7 @@ def _get_client():
     if _client_cache is not None:
         return _client_cache if _client_cache else None
 
-    token = os.environ.get("HF_TOKEN", "")
+    token = HF_TOKEN
     if not token:
         logger.info("[AI] HF_TOKEN not set — AI analysis disabled.")
         _client_cache = False

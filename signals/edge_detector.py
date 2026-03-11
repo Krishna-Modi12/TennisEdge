@@ -146,8 +146,8 @@ def _process_match(match: dict) -> dict:
         "form_prob":    model.get("form_prob_a") if is_a else (1.0 - model.get("form_prob_a", 0.5)),
         "surface_prob": model.get("surface_prob_a") if is_a else (1.0 - model.get("surface_prob_a", 0.5)),
         "h2h_prob":     model.get("h2h_prob_a") if is_a else (1.0 - model.get("h2h_prob_a", 0.5)),
-        "h2h_wins_a":   model.get("h2h_wins_a", 0),
-        "h2h_wins_b":   model.get("h2h_wins_b", 0),
+        "h2h_wins_a":   model.get("h2h_wins_a", 0) if is_a else model.get("h2h_wins_b", 0),
+        "h2h_wins_b":   model.get("h2h_wins_b", 0) if is_a else model.get("h2h_wins_a", 0),
     }
 
     return {
