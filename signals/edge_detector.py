@@ -14,6 +14,7 @@ where Confidence = model_prob / (1 - model_prob)
 from config import MIN_VALUE_EDGE, MIN_MODEL_PROB, MIN_ODDS, MAX_ODDS
 from models.elo_model import predict as elo_predict
 from database.db import signal_exists, save_signal
+from tennis_backtest.elo_filter import elo_agrees
 
 
 def odds_to_prob(odds: float) -> float:
@@ -35,7 +36,9 @@ def _de_vig_probs(odds_a: float, odds_b: float) -> tuple[float, float]:
     return pa_raw / total, pb_raw / total
 
 
-def calculate_true_edge(model_prob: float, decimal_odds: float) -> dict:
+def calculate_true_edge(model_prob: float, decimal_odds: float,
+                        min_value_edge: float = MIN_VALUE_EDGE,
+                        min_model_prob: float = MIN_MODEL_PROB) -> dict:
     """
     Dual validation edge calculation.
     Returns value_edge, confidence, true_edge_score, and whether signal is valid based on thresholds.
@@ -45,7 +48,7 @@ def calculate_true_edge(model_prob: float, decimal_odds: float) -> dict:
     confidence = model_prob / (1.0 - model_prob) if model_prob < 1.0 else 99.0
     true_edge_score = value_edge * confidence
 
-    signal_valid = (value_edge >= MIN_VALUE_EDGE and model_prob >= MIN_MODEL_PROB)
+    signal_valid = (value_edge >= min_value_edge and model_prob >= min_model_prob)
 
     return {
         "implied_prob":    round(implied_prob, 4),
@@ -114,19 +117,13 @@ def _process_match(match: dict) -> dict:
     elo_prob_a = elo["prob_a"]
     elo_prob_b = elo["prob_b"]
 
-    MAX_ELO_DISAGREEMENT = 0.15
-
     # Dual validation for each side
     best_signal = None
 
     if a_in_range and odds_a > 0:
         te_a = calculate_true_edge(prob_a, odds_a)
-        
-        # Elo Filter Check for Player A
-        gap_a = abs(elo_prob_a - prob_a)
-        elo_agrees_a = (elo_prob_a > 0.5) == (prob_a > 0.5) and gap_a <= MAX_ELO_DISAGREEMENT
-        
-        if te_a["signal_valid"] and elo_agrees_a:
+
+        if te_a["signal_valid"] and elo_agrees(prob_a, elo_prob_a, max_gap=0.15):
             best_signal = {
                 "player": player_a, "odds": odds_a, "model_prob": prob_a,
                 "market_prob": te_a["implied_prob"],
@@ -136,12 +133,8 @@ def _process_match(match: dict) -> dict:
 
     if b_in_range and odds_b > 0:
         te_b = calculate_true_edge(prob_b, odds_b)
-        
-        # Elo Filter Check for Player B
-        gap_b = abs(elo_prob_b - prob_b)
-        elo_agrees_b = (elo_prob_b > 0.5) == (prob_b > 0.5) and gap_b <= MAX_ELO_DISAGREEMENT
 
-        if te_b["signal_valid"] and elo_agrees_b:
+        if te_b["signal_valid"] and elo_agrees(prob_b, elo_prob_b, max_gap=0.15):
             if best_signal is None or te_b["true_edge_score"] > best_signal["true_edge_score"]:
                 best_signal = {
                     "player": player_b, "odds": odds_b, "model_prob": prob_b,

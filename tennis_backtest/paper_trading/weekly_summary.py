@@ -10,7 +10,19 @@ from database.db import get_signal_accuracy
 
 
 def generate_weekly_summary() -> str:
-    acc = get_signal_accuracy()
+    db_note = None
+    try:
+        acc = get_signal_accuracy()
+    except Exception as e:
+        acc = {
+            "tracked_results": 0,
+            "wins": 0,
+            "losses": 0,
+            "accuracy_pct": 0.0,
+            "roi_pct": 0.0,
+            "avg_odds": 0.0,
+        }
+        db_note = f"Database unavailable: {e}"
     clv = calculate_clv()
 
     lines = [
@@ -29,6 +41,10 @@ def generate_weekly_summary() -> str:
         f"Average CLV: {clv['avg_clv']:+.4f}",
     ]
 
+    if db_note:
+        lines.append("")
+        lines.append(f"Note: {db_note}")
+
     if clv["by_surface"]:
         lines.append("")
         lines.append("CLV by Surface:")
@@ -37,6 +53,9 @@ def generate_weekly_summary() -> str:
                 f"- {row['surface']}: n={row['count']}, +={row['positive']}, "
                 f"-={row['negative']}, 0={row['zero']}, avg={row['avg_clv']:+.4f}"
             )
+    elif clv.get("note"):
+        lines.append("")
+        lines.append(f"CLV Note: {clv['note']}")
 
     return "\n".join(lines)
 

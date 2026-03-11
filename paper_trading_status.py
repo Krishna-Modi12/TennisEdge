@@ -31,9 +31,30 @@ def get_paper_trading_status(target_bets: int = 100) -> dict:
         )
         row = cur.fetchone() or (0, 0, 0, 0, 0, None, None)
     except Exception as e:
+        clv = calculate_clv()
         return {
             "ok": False,
             "error": f"Database unavailable: {e}",
+            "generated_signals": 0,
+            "pending_signals": 0,
+            "resolved": {"wins": 0, "losses": 0, "pushes": 0},
+            "tracked_bets": 0,
+            "target_bets": target_bets,
+            "remaining_to_target": target_bets,
+            "progress_pct": 0.0,
+            "accuracy_pct": 0.0,
+            "roi_pct": 0.0,
+            "first_signal_at": None,
+            "last_signal_at": None,
+            "clv": {
+                "source": clv.get("source"),
+                "coverage_pct": clv.get("coverage_pct", 0.0),
+                "avg_clv": clv.get("avg_clv", 0.0),
+                "positive": clv.get("positive", 0),
+                "negative": clv.get("negative", 0),
+                "zero": clv.get("zero", 0),
+                "note": clv.get("note"),
+            },
         }
 
     total_signals = int(row[0] or 0)
@@ -82,7 +103,24 @@ def get_paper_trading_status(target_bets: int = 100) -> dict:
 
 def _format_report(status: dict) -> str:
     if not status.get("ok"):
-        return f"PAPER TRADING STATUS\n====================\nERROR: {status.get('error')}"
+        lines = [
+            "PAPER TRADING STATUS",
+            "====================",
+            f"ERROR: {status.get('error')}",
+            "",
+            f"100-Bet Clock: {status.get('tracked_bets', 0)}/{status.get('target_bets', 100)} ({status.get('progress_pct', 0.0)}%)",
+            "CLV",
+            "---",
+            f"Source: {status.get('clv', {}).get('source', 'none')}",
+            f"Coverage: {status.get('clv', {}).get('coverage_pct', 0.0)}%",
+            f"Avg CLV: {status.get('clv', {}).get('avg_clv', 0.0):+.4f}",
+        ]
+        note = status.get("clv", {}).get("note")
+        if note:
+            lines.append(f"CLV Note: {note}")
+        lines.append("")
+        lines.append("Action: provide DATABASE_URL/ODDS_API_KEY or signals.csv for paper-trading tracking.")
+        return "\n".join(lines)
 
     lines = [
         "PAPER TRADING STATUS",
@@ -121,6 +159,11 @@ def _parse_args():
     p = argparse.ArgumentParser(description="Show paper trading status and 100-bet progress.")
     p.add_argument("--target-bets", type=int, default=100)
     p.add_argument("--json", action="store_true", help="Print JSON output")
+    p.add_argument(
+        "--strict-db",
+        action="store_true",
+        help="Exit non-zero when database is unavailable.",
+    )
     return p.parse_args()
 
 
@@ -131,7 +174,9 @@ def main() -> int:
         print(json.dumps(status, indent=2))
     else:
         print(_format_report(status))
-    return 0 if status.get("ok") else 1
+    if not status.get("ok") and args.strict_db:
+        return 1
+    return 0
 
 
 if __name__ == "__main__":

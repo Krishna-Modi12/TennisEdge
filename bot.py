@@ -341,8 +341,11 @@ async def tournament_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         if m.get("odds_a") and m.get("odds_b") and m["odds_a"] > 0 and m["odds_b"] > 0:
             odds_text = f"   📊 Odds: {m['odds_a']:.2f} / {m['odds_b']:.2f}\n"
             try:
-                from signals.edge_detector import _de_vig_probs
-                elo_model = predict(m["player_a"], m["player_b"], m.get("surface", "hard"))
+                from signals.edge_detector import _de_vig_probs, calculate_true_edge
+                from tennis_backtest.elo_filter import elo_agrees as _elo_agrees
+                from models.elo_model import predict as elo_predict
+                
+                elo_model = elo_predict(m["player_a"], m["player_b"], m.get("surface", "hard"))
                 pinny_a = m.get("pinny_odds_a")
                 pinny_b = m.get("pinny_odds_b")
                 
@@ -354,8 +357,8 @@ async def tournament_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                     te_a = calculate_true_edge(prob_a, m["odds_a"])
                     te_b = calculate_true_edge(prob_b, m["odds_b"])
                     
-                    elo_agrees_a = (elo_model["prob_a"] > 0.5) == (prob_a > 0.5) and abs(elo_model["prob_a"] - prob_a) <= 0.15
-                    elo_agrees_b = (elo_model["prob_b"] > 0.5) == (prob_b > 0.5) and abs(elo_model["prob_b"] - prob_b) <= 0.15
+                    elo_agrees_a = _elo_agrees(prob_a, elo_model["prob_a"], max_gap=0.15)
+                    elo_agrees_b = _elo_agrees(prob_b, elo_model["prob_b"], max_gap=0.15)
                     
                     if te_a["signal_valid"] and elo_agrees_a:
                         edge_text = f"   🔥 Edge: {safe_pa} +{te_a['true_edge_score']:.1%} (conf {te_a['confidence']:.1f}x)\n"
@@ -449,32 +452,53 @@ async def predict_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     try:
         # Get model prediction
         try:
-            from models.advanced_model import advanced_predict as model_predict
-            result = model_predict(m["player_a"], m["player_b"], m.get("surface", "hard"))
-            prob_a = result["prob_a"]
-            prob_b = result["prob_b"]
-            data_quality = result.get("data_quality", "unknown")
+            from signals.edge_detector import _de_vig_probs, calculate_true_edge
+            from models.elo_model import predict as elo_predict
+            from models.advanced_model import advanced_predict
+            from tennis_backtest.elo_filter import elo_agrees
+            
+            # 1. Primary Probability: Pinnacle De-Vig
+            pinny_a = m.get("pinny_odds_a")
+            pinny_b = m.get("pinny_odds_b")
+            prob_a, prob_b = _de_vig_probs(pinny_a, pinny_b)
+            if prob_a is None:
+                prob_a, prob_b = _de_vig_probs(m.get("odds_a"), m.get("odds_b"))
+            
+            if prob_a is None:
+                prob_a, prob_b = 0.5, 0.5
+            
+            # 2. Secondary/Enrichment Models
+            elo_res = elo_predict(m["player_a"], m["player_b"], m.get("surface", "hard"))
+            adv_res = advanced_predict(m["player_a"], m["player_b"], m.get("surface", "hard"))
+            data_quality = adv_res.get("data_quality", "elo_only")
+            
+            result = adv_res # Use advanced results for the AI prompt enrichment
         except Exception as ex:
             logger.warning(f"Model predict fallback: {ex}")
-            prob_a = 0.5
-            prob_b = 0.5
+            prob_a, prob_b = 0.5, 0.5
             data_quality = "elo_only"
             result = {}
+            elo_res = {"prob_a": 0.5, "prob_b": 0.5}
 
         odds_a = m.get("odds_a", 0)
         odds_b = m.get("odds_b", 0)
         surface = m.get("surface", "hard")
         has_odds = bool(odds_a and odds_a > 0 and odds_b and odds_b > 0)
 
-        # Determine who has the edge
+        # Determine who has the edge using Pinnacle primary model + Elo filter
         if has_odds:
-            implied_a = 1.0 / odds_a
-            edge_a = prob_a - implied_a
-            implied_b = 1.0 / odds_b
-            edge_b = prob_b - implied_b
+            te_a = calculate_true_edge(prob_a, odds_a)
+            te_b = calculate_true_edge(prob_b, odds_b)
+            
+            # Check Elo agreement
+            elo_agrees_a = elo_agrees(prob_a, elo_res["prob_a"], max_gap=0.15)
+            elo_agrees_b = elo_agrees(prob_b, elo_res["prob_b"], max_gap=0.15)
+            
+            edge_a = te_a["true_edge_score"] if (te_a["signal_valid"] and elo_agrees_a) else -1.0
+            edge_b = te_b["true_edge_score"] if (te_b["signal_valid"] and elo_agrees_b) else -1.0
         else:
-            edge_a = 0
-            edge_b = 0
+            edge_a = -1.0
+            edge_b = -1.0
 
         # Pick the player with the larger edge (or higher prob) for AI analysis
         if prob_a >= prob_b:
