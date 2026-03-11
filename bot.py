@@ -609,7 +609,7 @@ async def help_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         "*AI Predictions*\n"
         "Use /predict to get DeepSeek AI analysis on any upcoming match.\n\n"
         "*Signal Threshold*\n"
-        "We send signals ONLY when Value Edge ≥ 10% AND the Model Win Probability ≥ 40%.\n\n"
+        "We send signals ONLY when Value Edge ≥ 4% AND the Model Win Probability ≥ 35%.\n\n"
         "*Credits*\n"
         "Each signal costs 1 credit. Use /buy to top up.\n\n"
         "*Commands*\n"

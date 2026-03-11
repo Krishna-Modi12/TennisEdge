@@ -4,9 +4,30 @@ Fetches live tennis fixtures and odds from AllSportsAPI.
 Falls back to mock data when MOCK_MODE=true or API fails.
 """
 
+import os
+import sys
 import datetime
 import requests
 from config import ODDS_API_KEY, MOCK_MODE
+
+# ── Production safety guard ───────────────────────────────────────────────
+# MOCK_MODE=true on a live Render instance almost always means someone
+# forgot to unset it after local testing. This guard prevents fake signals
+# from reaching real users.
+_MOCK_MODE  = os.getenv("MOCK_MODE", "false").lower() == "true"
+_IS_RENDER  = os.getenv("RENDER", "") != ""   # Render sets this automatically
+
+if _MOCK_MODE and _IS_RENDER:
+    _ALLOW_OVERRIDE = os.getenv("ALLOW_MOCK_ON_RENDER", "false").lower() == "true"
+    if not _ALLOW_OVERRIDE:
+        print(
+            "FATAL: MOCK_MODE=true detected on Render production instance.\n"
+            "This would cause fake signals to be sent to real paying users.\n"
+            "To allow this intentionally, set ALLOW_MOCK_ON_RENDER=true.\n"
+            "Exiting."
+        )
+        sys.exit(1)
+# ─────────────────────────────────────────────────────────────────────────
 
 ALLSPORTS_BASE = "https://apiv2.allsportsapi.com/tennis/"
 

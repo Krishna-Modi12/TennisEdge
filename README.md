@@ -14,7 +14,7 @@ Fetch Odds (AllSportsAPI)
 Value Edge = (Model Prob * Market Odds) - 1
 True Edge = Value Edge * Confidence
         ↓
-If Value Edge ≥ 10% and Model Prob ≥ 40% → Send Signal via Telegram
+If Value Edge ≥ 4% and Model Prob ≥ 35% → Send Signal via Telegram
         ↓
 Deduct 1 Credit from User
 ```
