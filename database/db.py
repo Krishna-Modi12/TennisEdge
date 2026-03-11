@@ -681,7 +681,7 @@ def update_signal_result(signal_id: int, result: str, actual_winner: str = None)
             "UPDATE signals SET result=%s, result_recorded_at=NOW() WHERE id=%s",
             (result, signal_id),
         )
-        if actual_winner:
+        if actual_winner and result in ("win", "loss"):
             actual_winner = normalize_player_name(actual_winner)
             conn.execute(
                 "INSERT INTO signal_results (signal_id, actual_winner, is_correct, recorded_at) "
@@ -691,6 +691,8 @@ def update_signal_result(signal_id: int, result: str, actual_winner: str = None)
                 "recorded_at = NOW()",
                 (signal_id, actual_winner, 1 if result == 'win' else 0),
             )
+        elif result == "push":
+            conn.execute("DELETE FROM signal_results WHERE signal_id=%s", (signal_id,))
         conn.commit()
     except Exception:
         conn.rollback()

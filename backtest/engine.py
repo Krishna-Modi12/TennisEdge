@@ -74,9 +74,17 @@ def _normalize_surface(s) -> str:
 def backtest(atp_from=2023, atp_to=2024, wta_from=2023, wta_to=2024,
              stake=100.0, min_value_edge=0.10, min_model_prob=0.40) -> dict:
     """
-    Run full historical backtest using dual-validation edge system.
-    Downloads match data with odds, applies model, simulates bets.
+    Run historical backtest using dual-validation edge system.
+    WARNING: This currently uses present-day database snapshots for form/H2H, 
+    introducing look-ahead bias. Performance metrics will be optimistic.
     """
+    print("\n" + "!" * 60)
+    print("WARNING: METHODOLOGICAL LEAK DETECTED")
+    print("This backtest uses the current DB-backed model which")
+    print("computes a present-day snapshot of player stats.")
+    print("This introduces look-ahead bias. ROI is optimistic.")
+    print("!" * 60 + "\n")
+    
     all_matches = []
 
     for tour, yr_from, yr_to in [("atp", atp_from, atp_to), ("wta", wta_from, wta_to)]:

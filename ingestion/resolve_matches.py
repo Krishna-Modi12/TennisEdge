@@ -68,13 +68,16 @@ def resolve_pending_signals():
                     actual_winner = f.get("event_second_player")
                 
                 if actual_winner:
+                    from utils import normalize_player_name
                     bet_on = sig["bet_on"]
-                    result = "win" if actual_winner == bet_on else "loss"
+                    norm_winner = normalize_player_name(actual_winner)
+                    norm_bet = normalize_player_name(bet_on)
+                    result = "win" if norm_winner == norm_bet else "loss"
                     update_signal_result(sig["id"], result, actual_winner)
                     resolved_count += 1
-            elif status == "Cancelled" or status == "Retired":
+            elif status in ("Cancelled", "Retired"):
                 # Assuming push for retired/cancelled matches
-                update_signal_result(sig["id"], "push", "None")
+                update_signal_result(sig["id"], "push", None)
                 resolved_count += 1
 
     if resolved_count > 0:

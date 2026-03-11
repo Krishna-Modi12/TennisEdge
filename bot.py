@@ -315,9 +315,9 @@ async def tournament_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                 te_a = calculate_true_edge(model["prob_a"], m["odds_a"])
                 te_b = calculate_true_edge(model["prob_b"], m["odds_b"])
                 if te_a["signal_valid"]:
-                    edge_text = f"   🔥 Edge: {m['player_a']} +{te_a['true_edge_score']:.1%} (conf {te_a['confidence']:.1f}x)\n"
+                    edge_text = f"   🔥 Edge: {safe_pa} +{te_a['true_edge_score']:.1%} (conf {te_a['confidence']:.1f}x)\n"
                 elif te_b["signal_valid"]:
-                    edge_text = f"   🔥 Edge: {m['player_b']} +{te_b['true_edge_score']:.1%} (conf {te_b['confidence']:.1f}x)\n"
+                    edge_text = f"   🔥 Edge: {safe_pb} +{te_b['true_edge_score']:.1%} (conf {te_b['confidence']:.1f}x)\n"
             except Exception:
                 pass
 
@@ -608,7 +608,7 @@ async def help_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         "*AI Predictions*\n"
         "Use /predict to get DeepSeek AI analysis on any upcoming match.\n\n"
         "*Signal Threshold*\n"
-        "We only send signals when edge > 7%.\n\n"
+        "We send signals ONLY when Value Edge ≥ 10% AND the Model Win Probability ≥ 40%.\n\n"
         "*Credits*\n"
         "Each signal costs 1 credit. Use /buy to top up.\n\n"
         "*Commands*\n"

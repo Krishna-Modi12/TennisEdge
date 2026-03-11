@@ -94,8 +94,8 @@ async def _send_signal_to_subscribers(signal: dict):
             # Successfully sent! Now deduct credit and record delivery
             from database.db import record_delivery
             deduct_credit(user["id"])
-            if signal.get("id"):
-                record_delivery(signal["id"], user["id"])
+            if signal.get("signal_id"):
+                record_delivery(signal["signal_id"], user["id"])
         except Exception as e:
             print(f"[Scheduler] Failed to send to {telegram_id}: {e}")
 

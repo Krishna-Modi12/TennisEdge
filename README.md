@@ -81,6 +81,9 @@ To add credits to a user (as admin):
 | /balance | Check your credits |
 | /buy | Purchase credits info |
 | /signals | View recent signals |
+| /matches | Upcoming matches |
+| /predict | AI match analysis |
+| /portfolio | Paper trading stats |
 | /help | How it works |
 | /scan | (Admin) Run pipeline now |
 | /addcredits | (Admin) Add credits manually |
@@ -97,7 +100,7 @@ tennisedge/
 ├── .env.example
 │
 ├── ingestion/
-│   └── fetch_odds.py           ← TheOddsAPI + mock data
+│   └── fetch_odds.py           ← AllSportsAPI + mock data
 │
 ├── models/
 │   └── elo_model.py            ← surface-adjusted Elo
