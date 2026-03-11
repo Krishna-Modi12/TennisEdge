@@ -190,6 +190,9 @@ _SCHEMA_STATEMENTS = [
 def init_schema():
     conn = get_conn()
     try:
+        # Enable JSONB support for dict conversion
+        psycopg2.extras.register_default_jsonb(conn._conn)
+
         for stmt in _SCHEMA_STATEMENTS:
             conn.execute(stmt)
         conn.commit()
@@ -200,6 +203,7 @@ def init_schema():
     except Exception:
         conn.rollback()
         raise
+
 
 
 def _migrate_signals_result_columns(conn):

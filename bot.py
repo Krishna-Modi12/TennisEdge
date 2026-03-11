@@ -166,20 +166,20 @@ async def start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     db_user = get_or_create_user(user.id, user.username)
 
     welcome = (
-        f"🎾 *Welcome to TennisEdge\\!*\n\n"
+        f"🎾 *Welcome to TennisEdge!*\n\n"
         f"I detect *value betting edges* in tennis matches using a "
-        f"surface\\-adjusted Elo model\\.\n\n"
+        f"surface-adjusted Elo model.\n\n"
         f"💳 Your credits: *{db_user['credits']}*\n\n"
         f"*Commands:*\n"
-        f"/signals \\– Latest edge signals\n"
-        f"/matches \\– Upcoming matches & odds\n"
-        f"/predict \\– 🤖 AI match predictions\n"
-        f"/portfolio \\– 📈 Live paper trading record\n"
-        f"/balance \\– Check your credits\n"
-        f"/buy \\– Purchase credits\n"
-        f"/beta \\– Join free beta channel\n"
-        f"/help \\– How it works\n\n"
-        f"_Each signal costs 1 credit\\._"
+        f"/signals – Latest edge signals\n"
+        f"/matches – Upcoming matches & odds\n"
+        f"/predict – 🤖 AI match predictions\n"
+        f"/portfolio – 📈 Live paper trading record\n"
+        f"/balance – Check your credits\n"
+        f"/buy – Purchase credits\n"
+        f"/beta – Join free beta channel\n"
+        f"/help – How it works\n\n"
+        f"_Each signal costs 1 credit._"
     )
     await update.message.reply_text(
         welcome,
@@ -438,6 +438,7 @@ async def tournament_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await query.edit_message_text(text, parse_mode="Markdown")
 
 
+
 # ── /predict ──────────────────────────────────────────────────────────────────
 
 async def predict(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -480,7 +481,12 @@ async def predict_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    idx = int(query.data.split("_")[1])
+    try:
+        idx = int(query.data.split("_")[1])
+    except (IndexError, ValueError):
+        await query.edit_message_text("❌ Selection error. Try /predict again.")
+        return
+
     match_list = ctx.user_data.get("predict_matches", [])
 
     if idx >= len(match_list):
@@ -496,69 +502,47 @@ async def predict_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     )
 
     try:
-        # Get model prediction
-        try:
-            from signals.edge_detector import _de_vig_probs, calculate_true_edge
-            from models.elo_model import predict as elo_predict
-            from models.advanced_model import advanced_predict
-            from tennis_backtest.elo_filter import elo_agrees
-            
-            # 1. Primary Probability: Pinnacle De-Vig
-            pinny_a = m.get("pinny_odds_a")
-            pinny_b = m.get("pinny_odds_b")
-            prob_a, prob_b = _de_vig_probs(pinny_a, pinny_b)
-            if prob_a is None:
-                prob_a, prob_b = _de_vig_probs(m.get("odds_a"), m.get("odds_b"))
-            
-            if prob_a is None:
-                prob_a, prob_b = 0.5, 0.5
-            
-            # 2. Secondary/Enrichment Models
-            elo_res = elo_predict(m["player_a"], m["player_b"], m.get("surface", "hard"))
-            adv_res = advanced_predict(m["player_a"], m["player_b"], m.get("surface", "hard"))
-            data_quality = adv_res.get("data_quality", "elo_only")
-            
-            result = adv_res # Use advanced results for the AI prompt enrichment
-        except Exception as ex:
-            logger.warning(f"Model predict fallback: {ex}")
-            prob_a, prob_b = 0.5, 0.5
-            data_quality = "elo_only"
-            result = {}
-            elo_res = {"prob_a": 0.5, "prob_b": 0.5}
+        from models.advanced_model import advanced_predict
+        from signals.edge_detector import calculate_true_edge
 
-        odds_a = m.get("odds_a", 0)
-        odds_b = m.get("odds_b", 0)
+        # Get core model prediction (Unified 4-Factor Balanced Model)
         surface = m.get("surface", "hard")
-        has_odds = bool(odds_a and odds_a > 0 and odds_b and odds_b > 0)
+        res = advanced_predict(m["player_a"], m["player_b"], surface)
+        
+        prob_a = res["prob_a"]
+        prob_b = res["prob_b"]
+        data_quality = res.get("data_quality", "partial")
 
-        # Determine who has the edge using Pinnacle primary model + Elo filter
-        if has_odds:
-            te_a = calculate_true_edge(prob_a, odds_a)
-            te_b = calculate_true_edge(prob_b, odds_b)
-            
-            # Check Elo agreement
-            elo_agrees_a = elo_agrees(prob_a, elo_res["prob_a"], max_gap=0.15)
-            elo_agrees_b = elo_agrees(prob_b, elo_res["prob_b"], max_gap=0.15)
-            
-            edge_a = te_a["true_edge_score"] if (te_a["signal_valid"] and elo_agrees_a) else -1.0
-            edge_b = te_b["true_edge_score"] if (te_b["signal_valid"] and elo_agrees_b) else -1.0
-        else:
-            edge_a = -1.0
-            edge_b = -1.0
+        odds_a = float(m.get("odds_a") or 0)
+        odds_b = float(m.get("odds_b") or 0)
 
-        # Pick the player with the larger edge (or higher prob) for AI analysis
+        # Determine who to focus on (player with higher prob)
         if prob_a >= prob_b:
             focus_player = m["player_a"]
             focus_opponent = m["player_b"]
             focus_prob = prob_a
-            focus_odds = odds_a if odds_a else 2.0
-            focus_edge = edge_a if has_odds else 0.05
+            focus_odds = odds_a
+            # Probs for Player A
+            f_elo = res.get("elo_prob_a", 0.5)
+            f_form = res.get("form_prob_a", 0.5)
+            f_surf = res.get("surface_prob_a", 0.5)
+            f_h2h = res.get("h2h_prob_a", 0.5)
         else:
             focus_player = m["player_b"]
             focus_opponent = m["player_a"]
             focus_prob = prob_b
-            focus_odds = odds_b if odds_b else 2.0
-            focus_edge = edge_b if has_odds else 0.05
+            focus_odds = odds_b
+            # Probs for Player B (inverted)
+            f_elo = 1.0 - res.get("elo_prob_a", 0.5)
+            f_form = 1.0 - res.get("form_prob_a", 0.5)
+            f_surf = 1.0 - res.get("surface_prob_a", 0.5)
+            f_h2h = 1.0 - res.get("h2h_prob_a", 0.5)
+
+        # Calculate edge for focus player
+        focus_edge = 0.0
+        if focus_odds > 0:
+            te = calculate_true_edge(focus_prob, focus_odds)
+            focus_edge = te["true_edge_score"]
 
         # Call DeepSeek AI
         ai_text = ""
@@ -572,87 +556,49 @@ async def predict_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                 odds=focus_odds,
                 value_edge=focus_edge,
                 data_quality=data_quality,
-                elo_prob=result.get("elo_prob_a"),
-                form_prob=result.get("form_prob_a"),
-                surface_prob=result.get("surface_prob_a"),
-                h2h_prob=result.get("h2h_prob_a"),
+                elo_prob=f_elo,
+                form_prob=f_form,
+                surface_prob=f_surf,
+                h2h_prob=f_h2h,
             )
-        except Exception as e:
-            logger.warning(f"AI prediction error: {e}")
-            ai_text = f"AI error: {e}"
+        except Exception as ai_err:
+            logger.warning(f"AI error: {ai_err}")
+            ai_text = "AI analysis temporarily unavailable."
 
         if not ai_text:
-            # Distinguish between missing token and other failures
             hf_set = bool(os.environ.get("HF_TOKEN", ""))
-            if not hf_set:
-                ai_text = "HF_TOKEN not set. Add it in Render Dashboard > Environment to enable AI."
-            else:
-                ai_text = "AI model did not return a response. The service may be temporarily busy."
+            ai_text = "AI analysis is currently disabled (HF_TOKEN missing)." if not hf_set else "AI service busy."
 
-        # Format the response
+        # Format Final Result
         surface_emoji = {"clay": "🟤", "hard": "🔵", "grass": "🟢"}.get(surface, "🎾")
-        prob_a_pct = round(prob_a * 100, 1)
-        prob_b_pct = round(prob_b * 100, 1)
-
+        
         msg = (
-            f"🤖 DEEPSEEK AI PREDICTION\n"
+            f"🤖 *AI Match Prediction*\n"
             f"━━━━━━━━━━━━━━━━━━━\n\n"
-            f"🏆 {m.get('tournament', 'Tournament')}\n"
-            f"⚔️ {m['player_a']} vs {m['player_b']}\n"
-            f"{surface_emoji} Surface: {surface.title()}\n\n"
-            f"📊 Model Probabilities:\n"
-            f"  {m['player_a']}: {prob_a_pct}%\n"
-            f"  {m['player_b']}: {prob_b_pct}%\n\n"
-        )
-
-        if has_odds:
-            msg += (
-                f"💰 Odds:\n"
-                f"  {m['player_a']}: {odds_a:.2f}\n"
-                f"  {m['player_b']}: {odds_b:.2f}\n\n"
-            )
-            edge_pct = round(max(edge_a, edge_b) * 100, 1)
-            if edge_pct > 0:
-                msg += f"💎 Best Edge: {focus_player} +{edge_pct}%\n\n"
-        else:
-            msg += "💰 Odds: Not yet available for this match\n\n"
-
-        # Add model breakdown if available
-        if data_quality != "elo_only" and result:
-            elo_p = round(result.get("elo_prob_a", 0.5) * 100, 1)
-            form_p = round(result.get("form_prob_a", 0.5) * 100, 1)
-            surf_p = round(result.get("surface_prob_a", 0.5) * 100, 1)
-            h2h_p = round(result.get("h2h_prob_a", 0.5) * 100, 1)
-            msg += (
-                f"📐 Model Breakdown:\n"
-                f"  Elo (40%): {elo_p}%\n"
-                f"  Form (25%): {form_p}%\n"
-                f"  Surface (20%): {surf_p}%\n"
-                f"  H2H (15%): {h2h_p}%\n\n"
-            )
-        elif prob_a == 0.5 and prob_b == 0.5:
-            msg += "⚠️ Players not in database — model defaulted to 50/50\n\n"
-
-        msg += (
-            f"🤖 AI Analysis:\n"
-            f"{ai_text}\n\n"
+            f"⚔️ *{m['player_a']} vs {m['player_b']}*\n"
+            f"🏟 {m.get('tournament', 'Unknown')} | {surface_emoji} {surface.title()}\n\n"
+            f"📈 *Winning Probabilities:*\n"
+            f"• {m['player_a']}: {round(prob_a*100, 1)}%\n"
+            f"• {m['player_b']}: {round(prob_b*100, 1)}%\n\n"
+            f"🔥 *Focus:* {focus_player}\n"
+            f"💰 *Market Odds:* {focus_odds if focus_odds > 0 else 'N/A'}\n"
+            f"💎 *Estimated Edge:* {round(focus_edge*100, 1)}%\n\n"
+            f"📋 *Model Rationale:*\n"
+            f"_{ai_text}_\n\n"
             f"━━━━━━━━━━━━━━━━━━━\n"
-            f"Powered by DeepSeek AI via HuggingFace"
+            f"_TennisEdge Predictive Model_"
         )
 
-        if len(msg) > 4000:
-            msg = msg[:3950] + "\n\n...truncated"
-
-        await query.edit_message_text(msg)
+        await query.edit_message_text(
+            msg,
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Home", callback_data="menu_home")]])
+        )
 
     except Exception as e:
-        logger.exception(f"predict_callback crashed: {e}")
-        try:
-            await query.edit_message_text(
-                f"❌ Prediction failed: {e}\n\nPlease try /predict again."
-            )
-        except Exception:
-            pass
+        logger.exception(f"predict_callback fatal error: {e}")
+        await query.edit_message_text("❌ An error occurred during analysis. Try again later.")
+
 
 
 # ── /menu callbacks ───────────────────────────────────────────────────────────
@@ -1242,19 +1188,19 @@ async def help_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         "🎾 *TennisEdge – How It Works*\n\n"
         "*What is an Edge?*\n"
         "Edge = Model Probability – Market Probability\n\n"
-        "When our Elo model says a player has a 58% chance of winning, "
+        "When our AI model says a player has a 58% win chance, "
         "but the bookmaker's odds imply only 47%, that's an 11% edge — "
         "a potentially mispriced bet.\n\n"
-        "*Surface Adjustment*\n"
-        "We track separate Elo ratings for Clay, Hard, and Grass courts. "
-        "A player's clay record is weighted more heavily on clay matches.\n\n"
+        "*Model Architecture*\n"
+        "Our logic combines 4 factors: Elo Ratings (40%), Recent Form (25%), "
+        "Surface-specific win rates (20%), and Head-to-Head history (15%).\n\n"
         "*AI Predictions*\n"
         "Use /predict to get DeepSeek AI analysis on any upcoming match.\n\n"
         "*Signal Threshold*\n"
         "We send signals ONLY when Value Edge ≥ 4% AND the Model Win Probability ≥ 35%.\n\n"
-        "*Backtest Model*\n"
-        "Admin /backtest uses Pinnacle implied probabilities (de-vigged)\n"
-        "with point-in-time Elo as a secondary confirmation filter.\n\n"
+        "*Paper Trading*\n"
+        "The bot tracks every signal with a virtual 1-unit flat bet to validate "
+        "the model's live ROI before any real money is suggested.\n\n"
         "*Community*\n"
         "Use /beta to join the free beta Telegram channel.\n\n"
         "*Credits*\n"
@@ -1264,10 +1210,10 @@ async def help_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         "/balance – Check credits\n"
         "/signals – Latest signals\n"
         "/matches – Upcoming matches & odds\n"
-        "/predict – 🤖 AI match predictions\n"
-        "/portfolio – 📈 Live paper trading record\n"
-        "/beta – Join free beta channel\n"
-        "/buy – Purchase credits",
+        "/predict – 🤖 AI predictions\n"
+        "/portfolio – 📈 Track record\n"
+        "/beta – Join channel\n"
+        "/buy – Buy credits",
         parse_mode="Markdown"
     )
 

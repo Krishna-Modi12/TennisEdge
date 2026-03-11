@@ -139,6 +139,17 @@ def _process_match(match: dict) -> dict:
         odds=best_signal["odds"],
     )
 
+    # Prepare factors for breakdown (correctly flipped for the chosen winner)
+    is_a = (best_signal["player"] == player_a)
+    factors = {
+        "elo_prob":     model.get("elo_prob_a") if is_a else (1.0 - model.get("elo_prob_a", 0.5)),
+        "form_prob":    model.get("form_prob_a") if is_a else (1.0 - model.get("form_prob_a", 0.5)),
+        "surface_prob": model.get("surface_prob_a") if is_a else (1.0 - model.get("surface_prob_a", 0.5)),
+        "h2h_prob":     model.get("h2h_prob_a") if is_a else (1.0 - model.get("h2h_prob_a", 0.5)),
+        "h2h_wins_a":   model.get("h2h_wins_a", 0),
+        "h2h_wins_b":   model.get("h2h_wins_b", 0),
+    }
+
     return {
         "signal_id":        signal_id,
         "match_id":         match_id,
@@ -154,7 +165,6 @@ def _process_match(match: dict) -> dict:
         "confidence":       best_signal["confidence"],
         "true_edge_score":  best_signal["true_edge_score"],
         "edge":             best_signal["true_edge_score"],
-        # Elo verification stats
-        "elo_prob":         best_signal.get("elo_prob"),
-        "data_quality":     "Pinnacle+Elo",
+        "data_quality":     model.get("data_quality", "partial"),
+        **factors
     }

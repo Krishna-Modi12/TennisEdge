@@ -71,10 +71,10 @@ def format_signal(signal: dict) -> str:
 
     # Add 4-factor model breakdown if available
     if signal.get("data_quality") and signal["data_quality"] != "elo_only":
-        elo_p   = round(signal.get("elo_prob_a", 0.5) * 100, 1)
-        form_p  = round(signal.get("form_prob_a", 0.5) * 100, 1)
-        surf_p  = round(signal.get("surface_prob_a", 0.5) * 100, 1)
-        h2h_p   = round(signal.get("h2h_prob_a", 0.5) * 100, 1)
+        elo_p   = round(signal.get("elo_prob", 0.5) * 100, 1)
+        form_p  = round(signal.get("form_prob", 0.5) * 100, 1)
+        surf_p  = round(signal.get("surface_prob", 0.5) * 100, 1)
+        h2h_p   = round(signal.get("h2h_prob", 0.5) * 100, 1)
         h2h_wa  = signal.get("h2h_wins_a", 0)
         h2h_wb  = signal.get("h2h_wins_b", 0)
         quality = signal["data_quality"].replace("_", " ").title()
@@ -92,6 +92,7 @@ def format_signal(signal: dict) -> str:
         f"_1 credit deducted from your balance_"
     )
     return msg
+
 
 
 def format_signal_with_ai(signal: dict, ai_text: str) -> str:
