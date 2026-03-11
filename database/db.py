@@ -310,6 +310,17 @@ def get_subscribers_with_info() -> list:
         raise
 
 
+def get_all_user_telegram_ids() -> list:
+    """All registered users (for broad announcements like beta-channel invites)."""
+    conn = get_conn()
+    try:
+        cur = conn.execute("SELECT telegram_id FROM users ORDER BY created_at ASC")
+        return [r[0] for r in cur.fetchall()]
+    except Exception:
+        conn.rollback()
+        raise
+
+
 # ── Signal helpers ────────────────────────────────────────────────────────────
 
 def signal_exists(match_id: str) -> bool:

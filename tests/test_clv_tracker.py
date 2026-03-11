@@ -75,6 +75,17 @@ class ClvTrackerTests(unittest.TestCase):
         self.assertIn("By Surface:", report)
         self.assertIn("- hard:", report)
 
+    def test_db_unavailable_returns_no_data_summary(self):
+        with patch("clv_tracker.get_conn", side_effect=Exception("db down")), patch(
+            "clv_tracker.os.path.exists", return_value=False
+        ):
+            stats = clv_tracker.calculate_clv()
+
+        self.assertEqual(stats["source"], "none")
+        self.assertEqual(stats["total_resolved"], 0)
+        self.assertEqual(stats["with_closing_odds"], 0)
+        self.assertIn("Database unavailable", stats["note"])
+
 
 if __name__ == "__main__":
     unittest.main()

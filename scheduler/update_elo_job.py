@@ -12,8 +12,17 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import logging
+import os
+import sys
 
 import requests
+
+if __package__ in (None, ""):
+    # Allow direct script execution:
+    #   python scheduler/update_elo_job.py --dry-run
+    _repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    if _repo_root not in sys.path:
+        sys.path.insert(0, _repo_root)
 
 from config import ODDS_API_KEY
 from database.db import elo_history_event_exists, record_elo_history_event

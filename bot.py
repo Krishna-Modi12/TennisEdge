@@ -5,9 +5,11 @@ Commands:
     /balance     – check credits
     /signals     – view recent signals
     /buy         – credit packages info
+    /beta        – join free beta channel
     /help        – usage guide
     /scan        – admin: run pipeline manually
     /addcredits  – admin: top up credits
+    /broadcastbeta – admin: invite all users to beta channel
 """
 
 import sys
@@ -68,14 +70,16 @@ try:
     _startup_status = "import: config"
     from config import (
         TELEGRAM_BOT_TOKEN, TELEGRAM_ADMIN_ID,
-        CREDIT_PACKAGES, MOCK_MODE, UPI_ID
+        CREDIT_PACKAGES, MOCK_MODE, UPI_ID,
+        BETA_CHANNEL_LINK, BETA_CHANNEL_NAME,
     )
     print("  config OK", flush=True)
 
     _startup_status = "import: database.db"
     from database.db import (
         init_schema, get_or_create_user, get_user,
-        add_credits_manual, get_recent_signals
+        add_credits_manual, get_recent_signals,
+        get_all_user_telegram_ids,
     )
     print("  database.db OK", flush=True)
 
@@ -145,6 +149,7 @@ async def start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         f"/portfolio \\– 📈 Live paper trading record\n"
         f"/balance \\– Check your credits\n"
         f"/buy \\– Purchase credits\n"
+        f"/beta \\– Join free beta channel\n"
         f"/help \\– How it works\n\n"
         f"_Each signal costs 1 credit\\._"
     )
@@ -211,6 +216,31 @@ async def buy_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         f"Credits will be added within 1 hour.\n\n"
         f"_Your Telegram ID: `{query.from_user.id}`_",
         parse_mode="Markdown"
+    )
+
+
+# ── /beta ─────────────────────────────────────────────────────────────────────
+
+async def beta(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """User: get free beta community channel invite."""
+    if not BETA_CHANNEL_LINK:
+        await update.message.reply_text(
+            "📢 *Beta Channel*\n\n"
+            "The free beta channel is not configured yet.\n"
+            "Please check back shortly.",
+            parse_mode="Markdown",
+        )
+        return
+
+    keyboard = InlineKeyboardMarkup(
+        [[InlineKeyboardButton("Join Beta Channel", url=BETA_CHANNEL_LINK)]]
+    )
+    await update.message.reply_text(
+        f"📢 *{BETA_CHANNEL_NAME}*\n\n"
+        f"Join our free beta channel for daily updates, performance snapshots, "
+        f"and early access alerts.",
+        parse_mode="Markdown",
+        reply_markup=keyboard,
     )
 
 
@@ -311,14 +341,26 @@ async def tournament_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         if m.get("odds_a") and m.get("odds_b") and m["odds_a"] > 0 and m["odds_b"] > 0:
             odds_text = f"   📊 Odds: {m['odds_a']:.2f} / {m['odds_b']:.2f}\n"
             try:
-                model = predict(m["player_a"], m["player_b"], m.get("surface", "hard"))
-                # Dual validation edge for player A
-                te_a = calculate_true_edge(model["prob_a"], m["odds_a"])
-                te_b = calculate_true_edge(model["prob_b"], m["odds_b"])
-                if te_a["signal_valid"]:
-                    edge_text = f"   🔥 Edge: {safe_pa} +{te_a['true_edge_score']:.1%} (conf {te_a['confidence']:.1f}x)\n"
-                elif te_b["signal_valid"]:
-                    edge_text = f"   🔥 Edge: {safe_pb} +{te_b['true_edge_score']:.1%} (conf {te_b['confidence']:.1f}x)\n"
+                from signals.edge_detector import _de_vig_probs
+                elo_model = predict(m["player_a"], m["player_b"], m.get("surface", "hard"))
+                pinny_a = m.get("pinny_odds_a")
+                pinny_b = m.get("pinny_odds_b")
+                
+                prob_a, prob_b = _de_vig_probs(pinny_a, pinny_b)
+                if prob_a is None:
+                    prob_a, prob_b = _de_vig_probs(m["odds_a"], m["odds_b"])
+                
+                if prob_a is not None:
+                    te_a = calculate_true_edge(prob_a, m["odds_a"])
+                    te_b = calculate_true_edge(prob_b, m["odds_b"])
+                    
+                    elo_agrees_a = (elo_model["prob_a"] > 0.5) == (prob_a > 0.5) and abs(elo_model["prob_a"] - prob_a) <= 0.15
+                    elo_agrees_b = (elo_model["prob_b"] > 0.5) == (prob_b > 0.5) and abs(elo_model["prob_b"] - prob_b) <= 0.15
+                    
+                    if te_a["signal_valid"] and elo_agrees_a:
+                        edge_text = f"   🔥 Edge: {safe_pa} +{te_a['true_edge_score']:.1%} (conf {te_a['confidence']:.1f}x)\n"
+                    elif te_b["signal_valid"] and elo_agrees_b:
+                        edge_text = f"   🔥 Edge: {safe_pb} +{te_b['true_edge_score']:.1%} (conf {te_b['confidence']:.1f}x)\n"
             except Exception:
                 pass
 
@@ -611,8 +653,10 @@ async def help_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         "*Signal Threshold*\n"
         "We send signals ONLY when Value Edge ≥ 4% AND the Model Win Probability ≥ 35%.\n\n"
         "*Backtest Model*\n"
-        "Admin /backtest uses a leakage-safe point-in-time Elo simulation.\n"
-        "It is intentionally separate from the live 4-factor signal model.\n\n"
+        "Admin /backtest uses Pinnacle implied probabilities (de-vigged)\n"
+        "with point-in-time Elo as a secondary confirmation filter.\n\n"
+        "*Community*\n"
+        "Use /beta to join the free beta Telegram channel.\n\n"
         "*Credits*\n"
         "Each signal costs 1 credit. Use /buy to top up.\n\n"
         "*Commands*\n"
@@ -622,6 +666,7 @@ async def help_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         "/matches – Upcoming matches & odds\n"
         "/predict – 🤖 AI match predictions\n"
         "/portfolio – 📈 Live paper trading record\n"
+        "/beta – Join free beta channel\n"
         "/buy – Purchase credits",
         parse_mode="Markdown"
     )
@@ -681,8 +726,51 @@ async def addcredits(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     )
 
 
+async def broadcastbeta(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Admin: broadcast beta-channel invite to all registered users."""
+    if not is_admin(update.effective_user.id):
+        await update.message.reply_text("⛔ Admin only.")
+        return
+
+    if not BETA_CHANNEL_LINK:
+        await update.message.reply_text(
+            "❌ BETA_CHANNEL_LINK is not set. Add it in environment variables first."
+        )
+        return
+
+    custom_text = " ".join(ctx.args).strip()
+    if custom_text:
+        msg = custom_text
+    else:
+        msg = (
+            f"📢 *{BETA_CHANNEL_NAME}*\n\n"
+            f"We've opened a free beta channel.\n"
+            f"Join here: {BETA_CHANNEL_LINK}\n\n"
+            f"Get daily updates, paper-trading progress, and early feature announcements."
+        )
+
+    users = get_all_user_telegram_ids()
+    if not users:
+        await update.message.reply_text("No users found to broadcast to yet.")
+        return
+
+    await update.message.reply_text(f"📨 Broadcasting beta invite to {len(users)} users...")
+    sent = 0
+    failed = 0
+    for tid in users:
+        try:
+            await ctx.bot.send_message(chat_id=tid, text=msg, parse_mode="Markdown")
+            sent += 1
+        except Exception:
+            failed += 1
+
+    await update.message.reply_text(
+        f"✅ Beta broadcast completed.\nSent: {sent}\nFailed: {failed}"
+    )
+
+
 async def backtest_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """Admin: /backtest [atp_from] [atp_to] — run point-in-time Elo backtest."""
+    """Admin: /backtest [atp_from] [atp_to] — run Pinnacle+Elo backtest."""
     if not is_admin(update.effective_user.id):
         await update.message.reply_text("⛔ Admin only.")
         return
@@ -692,7 +780,7 @@ async def backtest_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(
         f"📊 Running backtest ({atp_from}-{atp_to})...\n"
-        f"Model: point-in-time Elo (leakage-safe)\n"
+        f"Model: Pinnacle implied + Elo confirmation\n"
         f"This may take a few minutes."
     )
 
@@ -798,10 +886,12 @@ def main():
     app.add_handler(CommandHandler("matches",    matches))
     app.add_handler(CommandHandler("predict",    predict))
     app.add_handler(CommandHandler("portfolio",  portfolio))
+    app.add_handler(CommandHandler("beta",       beta))
     app.add_handler(CommandHandler("help",       help_cmd))
     # Admin commands
     app.add_handler(CommandHandler("scan",       scan))
     app.add_handler(CommandHandler("addcredits", addcredits))
+    app.add_handler(CommandHandler("broadcastbeta", broadcastbeta))
     app.add_handler(CommandHandler("backtest",   backtest_cmd))
     # Callbacks
     app.add_handler(CallbackQueryHandler(buy_callback, pattern="^buy_"))

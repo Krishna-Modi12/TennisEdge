@@ -22,9 +22,9 @@ Deduct 1 Credit from User
 
 ### Backtest Model
 
-`/backtest` now runs a leakage-safe, point-in-time Elo simulation.
-It does **not** use the full live 4-factor model (form/surface/H2H blend).
-Use paper trading metrics as the primary validator for live behavior.
+`/backtest` uses Pinnacle implied probabilities (de-vigged) as the primary model
+and applies point-in-time Elo as a secondary confirmation filter.
+Use paper trading + CLV metrics as the primary validator for live behavior.
 
 ---
 
@@ -91,10 +91,12 @@ To add credits to a user (as admin):
 | /matches | Upcoming matches |
 | /predict | AI match analysis |
 | /portfolio | Paper trading stats |
+| /beta | Join free beta channel |
 | /help | How it works |
 | /scan | (Admin) Run pipeline now |
 | /addcredits | (Admin) Add credits manually |
-| /backtest | (Admin) Point-in-time Elo backtest |
+| /broadcastbeta | (Admin) Invite all users to beta channel |
+| /backtest | (Admin) Pinnacle+Elo backtest |
 
 ---
 
@@ -131,8 +133,16 @@ tennisedge/
 1. Set `MOCK_MODE=false` in `.env`
 2. Add your real `ODDS_API_KEY`
 3. Add your real `TELEGRAM_BOT_TOKEN`
-4. Deploy to any VPS (DigitalOcean, Hetzner, etc.)
-5. Run with: `python bot.py`
+4. Set `BETA_CHANNEL_LINK` to your free Telegram beta channel invite
+5. Deploy to any VPS (DigitalOcean, Hetzner, etc.)
+6. Run with: `python bot.py`
+
+### Paper Trading Kickoff
+
+- Scheduler now performs the first pipeline run immediately on startup.
+- Use this status command daily until 100 resolved paper bets are reached:
+  - `python paper_trading_status.py`
+  - JSON mode: `python paper_trading_status.py --json`
 
 ### Render Cron (Daily Elo Update)
 

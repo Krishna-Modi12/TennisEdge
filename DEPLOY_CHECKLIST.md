@@ -22,6 +22,7 @@ python -m py_compile monitor_live_quality.py
 - [ ] ODDS_API_KEY — set and active (check API quota remaining)
 - [ ] UPI_ID — set and matches payment details
 - [ ] DATABASE_URL — set correctly for Render persistent disk
+- [ ] BETA_CHANNEL_LINK — set to free beta Telegram channel invite URL
 - [ ] MOCK_MODE — explicitly set to "false" (never blank, never "true")
 - [ ] ALLOW_MOCK_ON_RENDER — must NOT be set in production
 
@@ -55,6 +56,9 @@ python health.py
 - [ ] Verify Render Cron Job exists for daily Elo update:
   - Schedule: `0 6 * * *` (UTC)
   - Command: `python -m scheduler.update_elo_job`
+- [ ] Check paper-trading clock:
+  - `python paper_trading_status.py`
+  - Confirm `tracked_bets` is increasing day-over-day
 - [ ] Run resolve_matches dry-run:
 
   ```bash

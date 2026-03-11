@@ -204,8 +204,12 @@ def start_scheduler():
         trigger="interval",
         minutes=POLL_INTERVAL_MINUTES,
         id="pipeline_job",
+        next_run_time=dt.datetime.utcnow(),
         replace_existing=True,
     )
     scheduler.start()
-    print(f"[Scheduler] Started – pipeline runs every {POLL_INTERVAL_MINUTES} minutes.")
+    print(
+        f"[Scheduler] Started – pipeline runs every {POLL_INTERVAL_MINUTES} minutes "
+        f"(first run scheduled immediately)."
+    )
     return scheduler

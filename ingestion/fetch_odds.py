@@ -141,11 +141,53 @@ def _live_odds() -> list:
         player_b = f.get("event_second_player", "Unknown")
         tournament = f.get("league_name", "Unknown")
         surface = _surface_from_tournament(tournament)
+    return result
+
+
+def _live_odds() -> list:
+    today = datetime.date.today()
+    tomorrow = today + datetime.timedelta(days=1)
+    date_from = today.strftime("%Y-%m-%d")
+    date_to = tomorrow.strftime("%Y-%m-%d")
+
+    # Step 1: Fetch fixtures (today + tomorrow)
+    fixtures = _fetch_fixtures(date_from, date_to)
+    if not fixtures:
+        return []
+
+    # Filter: singles only, upcoming (not finished), ATP/WTA/Challenger
+    upcoming = []
+    for f in fixtures:
+        country = f.get("country_name", "")
+        if "Doubles" in country:
+            continue
+        status = f.get("event_status", "")
+        if status == "Finished" or status == "Cancelled":
+            continue
+        upcoming.append(f)
+
+    if not upcoming:
+        print("[fetch_odds] No upcoming singles fixtures found.")
+        return []
+
+    # Step 2: Fetch odds for today+tomorrow
+    odds_map = _fetch_odds_map(date_from, date_to)
+
+    # Step 3: Combine fixtures + odds
+    all_matches = []
+    for f in upcoming:
+        event_key = str(f["event_key"])
+        player_a = f.get("event_first_player", "Unknown")
+        player_b = f.get("event_second_player", "Unknown")
+        tournament = f.get("league_name", "Unknown")
+        surface = _surface_from_tournament(tournament)
         event_time = f.get("event_time", "")
         event_date = f.get("event_date", "")
 
         odds_a = None
         odds_b = None
+        pinny_a = None
+        pinny_b = None
 
         if event_key in odds_map:
             ha = odds_map[event_key].get("Home/Away", {})
@@ -154,8 +196,17 @@ def _live_odds() -> list:
             # Pick best (highest) odds across bookmakers
             if home_odds:
                 odds_a = max(float(v) for v in home_odds.values())
+                # Extract Pinnacle odds if available (Pinnacle or PS or Pinny)
+                for k, v in home_odds.items():
+                    if "pinnacle" in str(k).lower():
+                        pinny_a = float(v)
+                        break
             if away_odds:
                 odds_b = max(float(v) for v in away_odds.values())
+                for k, v in away_odds.items():
+                    if "pinnacle" in str(k).lower():
+                        pinny_b = float(v)
+                        break
 
         # If no odds available, use placeholder
         if not odds_a or not odds_b:
@@ -170,6 +221,8 @@ def _live_odds() -> list:
             "surface":    surface,
             "odds_a":     round(odds_a, 2),
             "odds_b":     round(odds_b, 2),
+            "pinny_odds_a": round(pinny_a, 2) if pinny_a else None,
+            "pinny_odds_b": round(pinny_b, 2) if pinny_b else None,
             "event_date": event_date,
             "event_time": event_time,
             "status":     f.get("event_status", ""),
@@ -227,6 +280,8 @@ def _mock_odds() -> list:
             "surface":    "clay",
             "odds_a":     1.85,
             "odds_b":     2.05,
+            "pinny_odds_a": 1.83,
+            "pinny_odds_b": 2.01,
         },
         {
             "match_id":   "mock_002",
@@ -236,6 +291,8 @@ def _mock_odds() -> list:
             "surface":    "clay",
             "odds_a":     1.60,
             "odds_b":     2.40,
+            "pinny_odds_a": 1.55,
+            "pinny_odds_b": 2.35,
         },
         {
             "match_id":   "mock_003",
@@ -245,6 +302,8 @@ def _mock_odds() -> list:
             "surface":    "hard",
             "odds_a":     1.75,
             "odds_b":     2.10,
+            "pinny_odds_a": 1.71,
+            "pinny_odds_b": 2.05,
         },
         {
             "match_id":   "mock_004",
@@ -254,6 +313,8 @@ def _mock_odds() -> list:
             "surface":    "clay",
             "odds_a":     2.20,
             "odds_b":     1.70,
+            "pinny_odds_a": 2.15,
+            "pinny_odds_b": 1.66,
         },
         {
             "match_id":   "mock_005",
@@ -263,5 +324,7 @@ def _mock_odds() -> list:
             "surface":    "grass",
             "odds_a":     1.90,
             "odds_b":     1.95,
+            "pinny_odds_a": 1.88,
+            "pinny_odds_b": 1.91,
         },
     ]

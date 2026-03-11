@@ -2,10 +2,10 @@
 backtest/engine.py
 Historical backtesting engine for the TennisEdge dual-validation signal system.
 
-Stages:
-  1. Historical Backtest — simulate on past data from tennis-data.co.uk
-  2. Walk-Forward Test  — train on old data, test on newer unseen data
-  3. Paper Trading      — run live but don't bet real money
+Current backtest strategy:
+  1. Primary probability model: Pinnacle implied probability (PSW/PSL), de-vigged.
+  2. Secondary filter: point-in-time Elo confirmation.
+  3. Bet at available offer odds (Max/B365/Avg fallback).
 
 Usage:
     python -m backtest.engine --atp-from 2022 --atp-to 2024 --stake 100
@@ -26,7 +26,6 @@ from config import (
     MIN_VALUE_EDGE,
     MIN_MODEL_PROB,
 )
-from database.db import init_schema
 
 
 # ── Core edge calculation (mirrors edge_detector.py logic) ───────────────────
@@ -105,14 +104,48 @@ def _update_point_in_time(ratings: dict, winner: str, loser: str, surface: str):
         ratings[(loser, surf)] = rb + ELO_K_FACTOR * (0 - (1 - ea))
 
 
+def _de_vig_probs(odds_a: float, odds_b: float) -> tuple[float, float] | tuple[None, None]:
+    """Convert two-sided odds into no-vig probabilities."""
+    if odds_a is None or odds_b is None or odds_a <= 1.0 or odds_b <= 1.0:
+        return None, None
+    pa_raw = 1.0 / odds_a
+    pb_raw = 1.0 / odds_b
+    total = pa_raw + pb_raw
+    if total <= 0:
+        return None, None
+    return pa_raw / total, pb_raw / total
+
+
+def _pinnacle_probs(match: dict) -> tuple[float, float]:
+    """
+    Primary model probabilities from Pinnacle (PSW/PSL) with de-vig.
+    Falls back to market implied probabilities from offer odds if PS unavailable.
+    """
+    psw = match.get("pinny_odds_winner")
+    psl = match.get("pinny_odds_loser")
+    pa, pb = _de_vig_probs(psw, psl)
+    if pa is not None:
+        return pa, pb
+    # Fallback for sparse rows: behave like old implied market baseline.
+    pa, pb = _de_vig_probs(match.get("odds_winner"), match.get("odds_loser"))
+    if pa is not None:
+        return pa, pb
+    return 0.5, 0.5
+
+
 # ── Backtest Runner ──────────────────────────────────────────────────────────
 
 def backtest(atp_from=2023, atp_to=2024, wta_from=2023, wta_to=2024,
-             stake=100.0, min_value_edge=MIN_VALUE_EDGE, min_model_prob=MIN_MODEL_PROB) -> dict:
+             stake=100.0, min_value_edge=MIN_VALUE_EDGE, min_model_prob=MIN_MODEL_PROB,
+             min_elo_prob=0.50) -> dict:
     """
-    Run historical backtest using leakage-safe point-in-time Elo simulation.
+    Run historical backtest using Pinnacle-implied probabilities (primary)
+    and point-in-time Elo as a secondary confirmation filter.
     """
-    print("\n[Backtest] Using point-in-time Elo simulation (no look-ahead leakage).\n")
+    print(
+        "\n[Backtest] Using Pinnacle de-vig implied probabilities + "
+        "point-in-time Elo confirmation.\n"
+    )
     
     all_matches = []
 
@@ -142,17 +175,21 @@ def backtest(atp_from=2023, atp_to=2024, wta_from=2023, wta_to=2024,
 
     for i, m in enumerate(all_matches):
         try:
-            model = _predict_point_in_time(ratings, m["winner"], m["loser"], m["surface"])
+            elo = _predict_point_in_time(ratings, m["winner"], m["loser"], m["surface"])
+            pinny_prob_w, pinny_prob_l = _pinnacle_probs(m)
 
-            # Check both sides: winner and loser
-            for player, odds, is_winner, prob in [
-                (m["winner"], m["odds_winner"], 1, model["prob_a"]),
-                (m["loser"],  m["odds_loser"],  0, model["prob_b"]),
+            # Check both sides using Pinnacle probability; Elo is secondary gate.
+            for player, odds, is_winner, model_prob, elo_prob in [
+                (m["winner"], m["odds_winner"], 1, pinny_prob_w, elo["prob_a"]),
+                (m["loser"],  m["odds_loser"],  0, pinny_prob_l, elo["prob_b"]),
             ]:
                 if odds <= 1.0 or odds > 20.0:
                     continue
+                if elo_prob < min_elo_prob:
+                    skipped += 1
+                    continue
 
-                te = calculate_true_edge(prob, odds, min_value_edge, min_model_prob)
+                te = calculate_true_edge(model_prob, odds, min_value_edge, min_model_prob)
 
                 if not te["signal_valid"]:
                     skipped += 1
@@ -169,7 +206,8 @@ def backtest(atp_from=2023, atp_to=2024, wta_from=2023, wta_to=2024,
                     "opponent":        m["loser"] if player == m["winner"] else m["winner"],
                     "surface":         m["surface"],
                     "odds":            odds,
-                    "model_prob":      round(prob, 4),
+                    "model_prob":      round(model_prob, 4),
+                    "elo_prob":        round(elo_prob, 4),
                     "value_edge":      te["value_edge"],
                     "confidence":      te["confidence"],
                     "true_edge_score": te["true_edge_score"],
@@ -259,18 +297,23 @@ def _parse_matches(df: pd.DataFrame) -> list:
         if col not in df.columns:
             return matches
 
-    # Detect odds columns — tennis-data uses B365W/B365L, PSW/PSL, etc.
-    odds_winner_col = None
-    odds_loser_col = None
-    for prefix in ["b365", "ps", "max", "avg"]:
+    def _pair(prefix: str):
         wc = f"{prefix}w"
         lc = f"{prefix}l"
-        if wc in df.columns and lc in df.columns:
-            odds_winner_col = wc
-            odds_loser_col = lc
-            break
+        return (wc, lc) if wc in df.columns and lc in df.columns else (None, None)
 
-    if not odds_winner_col:
+    # Primary no-vig model comes from Pinnacle
+    pinny_w_col, pinny_l_col = _pair("ps")
+    # Offered odds to bet at: prefer max, then B365, then avg, then PS fallback.
+    offer_w_col, offer_l_col = _pair("max")
+    if not offer_w_col:
+        offer_w_col, offer_l_col = _pair("b365")
+    if not offer_w_col:
+        offer_w_col, offer_l_col = _pair("avg")
+    if not offer_w_col:
+        offer_w_col, offer_l_col = pinny_w_col, pinny_l_col
+
+    if not offer_w_col:
         return matches
 
     if "date" in df.columns:
@@ -285,10 +328,22 @@ def _parse_matches(df: pd.DataFrame) -> list:
             if not winner or not loser or winner == "nan" or loser == "nan":
                 continue
 
-            odds_w = float(row[odds_winner_col])
-            odds_l = float(row[odds_loser_col])
+            odds_w = float(row[offer_w_col])
+            odds_l = float(row[offer_l_col])
             if pd.isna(odds_w) or pd.isna(odds_l) or odds_w <= 1.0 or odds_l <= 1.0:
                 continue
+
+            pinny_w = None
+            pinny_l = None
+            if pinny_w_col and pinny_l_col:
+                try:
+                    pw = float(row[pinny_w_col])
+                    pl = float(row[pinny_l_col])
+                    if not pd.isna(pw) and not pd.isna(pl) and pw > 1.0 and pl > 1.0:
+                        pinny_w = pw
+                        pinny_l = pl
+                except Exception:
+                    pass
 
             surface = _normalize_surface(row.get("surface", "hard"))
             match_date = row["date"].strftime("%Y-%m-%d") if hasattr(row["date"], "strftime") else str(row["date"])
@@ -300,6 +355,8 @@ def _parse_matches(df: pd.DataFrame) -> list:
                 "surface":     surface,
                 "odds_winner": odds_w,
                 "odds_loser":  odds_l,
+                "pinny_odds_winner": pinny_w,
+                "pinny_odds_loser": pinny_l,
             })
         except Exception:
             continue
@@ -315,7 +372,7 @@ def format_backtest_report(result: dict) -> str:
     msg = (
         f"📊 *BACKTEST RESULTS*\n"
         f"━━━━━━━━━━━━━━━━━━━\n\n"
-        f"🧮 *Model:* Point-in-time Elo (leakage-safe)\n\n"
+        f"🧮 *Model:* Pinnacle implied (de-vig) + point-in-time Elo filter\n\n"
         f"🎯 *Total Bets:* {result['total_bets']}\n"
         f"✅ *Wins:* {result['wins']} | ❌ *Losses:* {result['losses']}\n"
         f"📈 *Win Rate:* {result['win_rate']}\n\n"
@@ -354,10 +411,8 @@ if __name__ == "__main__":
     parser.add_argument("--stake", type=float, default=100.0)
     parser.add_argument("--min-value-edge", type=float, default=MIN_VALUE_EDGE)
     parser.add_argument("--min-model-prob", type=float, default=MIN_MODEL_PROB)
+    parser.add_argument("--min-elo-prob", type=float, default=0.50)
     args = parser.parse_args()
-
-    print("Initializing database...")
-    init_schema()
 
     result = backtest(
         atp_from=args.atp_from, atp_to=args.atp_to,
@@ -365,6 +420,7 @@ if __name__ == "__main__":
         stake=args.stake,
         min_value_edge=args.min_value_edge,
         min_model_prob=args.min_model_prob,
+        min_elo_prob=args.min_elo_prob,
     )
 
     print("\n" + "=" * 50)

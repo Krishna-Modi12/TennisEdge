@@ -15,6 +15,10 @@ DATABASE_URL = os.getenv(
 
 UPI_ID = os.getenv("UPI_ID", "")
 
+# Free beta community channel
+BETA_CHANNEL_LINK = os.getenv("BETA_CHANNEL_LINK", "")
+BETA_CHANNEL_NAME = os.getenv("BETA_CHANNEL_NAME", "TennisEdge Beta")
+
 EDGE_THRESHOLD = 0.07
 MIN_ODDS       = 1.40
 MAX_ODDS       = 6.00
