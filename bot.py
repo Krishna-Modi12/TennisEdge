@@ -68,7 +68,7 @@ try:
     _startup_status = "import: config"
     from config import (
         TELEGRAM_BOT_TOKEN, TELEGRAM_ADMIN_ID,
-        CREDIT_PACKAGES, MOCK_MODE
+        CREDIT_PACKAGES, MOCK_MODE, UPI_ID
     )
     print("  config OK", flush=True)
 
@@ -205,7 +205,7 @@ async def buy_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         f"Price: *₹{pkg['price_inr']}*\n\n"
         f"*Payment Instructions:*\n"
         f"1. Send ₹{pkg['price_inr']} via UPI\n"
-        f"2. UPI ID: `your-upi-id@bank`\n"
+        f"2. UPI ID: `{UPI_ID}`\n"
         f"3. Screenshot the payment\n"
         f"4. Send screenshot to {admin_handle} with your Telegram ID\n\n"
         f"Credits will be added within 1 hour.\n\n"
@@ -296,11 +296,15 @@ async def tournament_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     try:
         from signals.edge_detector import odds_to_prob, calculate_true_edge
         from models.advanced_model import advanced_predict as predict
+        from signals.formatter import _escape
     except ImportError:
-        pass
+        _escape = lambda x: x
 
-    lines = [f"🏟 *{t_name}*\n"]
+    safe_t_name = _escape(t_name)
+    lines = [f"🏟 *{safe_t_name}*\n"]
     for i, m in enumerate(t_matches, 1):
+        safe_pa = _escape(m['player_a'])
+        safe_pb = _escape(m['player_b'])
         edge_text = ""
         odds_text = ""
         if m.get("odds_a") and m.get("odds_b") and m["odds_a"] > 0 and m["odds_b"] > 0:
@@ -327,7 +331,7 @@ async def tournament_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             status_text = ""
 
         lines.append(
-            f"{i}. *{m['player_a']}* vs *{m['player_b']}*\n"
+            f"{i}. *{safe_pa}* vs *{safe_pb}*\n"
             f"   🌍 {m['surface'].title()}  |  {status_text}\n"
             f"{odds_text}"
             f"{edge_text}"

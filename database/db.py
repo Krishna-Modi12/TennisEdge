@@ -661,7 +661,7 @@ def get_pending_signals(max_age_days: int = 7) -> list:
     conn = get_conn()
     try:
         cur = conn.execute(
-            "SELECT id, match_id, player_a, player_b, bet_on, surface, edge, odds "
+            "SELECT id, match_id, player_a, player_b, bet_on, surface, edge, odds, created_at "
             "FROM signals WHERE result='pending' "
             "AND created_at >= NOW() - %s * INTERVAL '1 day'",
             (max_age_days,),

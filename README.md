@@ -7,13 +7,14 @@ A Telegram bot that detects value betting edges in tennis matches using surface-
 ## How It Works
 
 ```
-Fetch Odds (TheOddsAPI)
+Fetch Odds (AllSportsAPI)
         ↓
-Surface-Adjusted Elo Model
+4-Factor Model (Elo, Form, Surface, H2H)
         ↓
-Edge = Model Prob – Market Prob
+Value Edge = (Model Prob * Market Odds) - 1
+True Edge = Value Edge * Confidence
         ↓
-If Edge > 7% → Send Signal via Telegram
+If Value Edge ≥ 10% and Model Prob ≥ 40% → Send Signal via Telegram
         ↓
 Deduct 1 Credit from User
 ```
@@ -59,11 +60,13 @@ python bot.py
 Leave `MOCK_MODE=true` in your `.env` — the bot will use fake match data so you can test all commands.
 
 To trigger a manual scan (as admin):
+
 ```
 /scan
 ```
 
 To add credits to a user (as admin):
+
 ```
 /addcredits <telegram_id> <amount>
 ```

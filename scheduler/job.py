@@ -74,8 +74,8 @@ async def _send_signal_to_subscribers(signal: dict):
         user = get_user(telegram_id)
         if not user:
             continue
-        deducted = deduct_credit(user["id"])
-        if not deducted:
+            
+        if user["credits"] <= 0:
             try:
                 await _bot_app.bot.send_message(
                     chat_id=telegram_id,
@@ -84,12 +84,18 @@ async def _send_signal_to_subscribers(signal: dict):
             except Exception:
                 pass
             continue
+            
         try:
             await _bot_app.bot.send_message(
                 chat_id=telegram_id,
                 text=msg,
                 parse_mode="Markdown",
             )
+            # Successfully sent! Now deduct credit and record delivery
+            from database.db import record_delivery
+            deduct_credit(user["id"])
+            if signal.get("id"):
+                record_delivery(signal["id"], user["id"])
         except Exception as e:
             print(f"[Scheduler] Failed to send to {telegram_id}: {e}")
 
