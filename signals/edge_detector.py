@@ -12,9 +12,8 @@ where Confidence = model_prob / (1 - model_prob)
 """
 
 from config import MIN_VALUE_EDGE, MIN_MODEL_PROB, MIN_ODDS, MAX_ODDS
-from models.elo_model import predict as elo_predict
+from models.advanced_model import advanced_predict as model_predict
 from database.db import signal_exists, save_signal
-from tennis_backtest.elo_filter import elo_agrees
 
 
 def odds_to_prob(odds: float) -> float:
@@ -41,7 +40,6 @@ def calculate_true_edge(model_prob: float, decimal_odds: float,
                         min_model_prob: float = MIN_MODEL_PROB) -> dict:
     """
     Dual validation edge calculation.
-    Returns value_edge, confidence, true_edge_score, and whether signal is valid based on thresholds.
     """
     implied_prob = 1.0 / decimal_odds
     value_edge = (model_prob * decimal_odds) - 1.0
@@ -62,7 +60,6 @@ def calculate_true_edge(model_prob: float, decimal_odds: float,
 def detect_edges(matches: list) -> list:
     """
     Run dual-validation edge detection on a list of matches with odds.
-    Returns list of signal dicts for matches that pass both validation gates.
     """
     signals = []
 
@@ -81,7 +78,7 @@ def detect_edges(matches: list) -> list:
 
 
 def _process_match(match: dict) -> dict:
-    """Process a single match with Pinnacle + Elo confirmation. Returns signal dict or None."""
+    """Process a single match with Advanced Blended Model. Returns signal dict or None."""
     match_id   = match["match_id"]
     player_a   = match["player_a"]
     player_b   = match["player_b"]
@@ -90,57 +87,40 @@ def _process_match(match: dict) -> dict:
     
     odds_a     = float(match["odds_a"] or 0)
     odds_b     = float(match["odds_b"] or 0)
-    
-    # Try Pinnacle odds first, fallback to max odds for implied prob if missing
-    pinny_a = match.get("pinny_odds_a")
-    pinny_b = match.get("pinny_odds_b")
 
     if signal_exists(match_id):
         return None
+
+    # Get model prediction (Blended: Elo, Form, H2H, Surface)
+    model = model_predict(player_a, player_b, surface)
+    prob_a, prob_b = model["prob_a"], model["prob_b"]
 
     a_in_range = MIN_ODDS <= odds_a <= MAX_ODDS
     b_in_range = MIN_ODDS <= odds_b <= MAX_ODDS
     if not a_in_range and not b_in_range:
         return None
 
-    # Primary probability model: Pinnacle implied probability
-    # If Pinnacle is missing, fallback to normal odds (which might include margin)
-    prob_a, prob_b = _de_vig_probs(pinny_a, pinny_b)
-    if prob_a is None:
-        prob_a, prob_b = _de_vig_probs(odds_a, odds_b)
-        
-    if prob_a is None:
-        return None
-
-    # Secondary filter: point-in-time Elo
-    elo = elo_predict(player_a, player_b, surface)
-    elo_prob_a = elo["prob_a"]
-    elo_prob_b = elo["prob_b"]
-
-    # Dual validation for each side
     best_signal = None
 
     if a_in_range and odds_a > 0:
         te_a = calculate_true_edge(prob_a, odds_a)
-
-        if te_a["signal_valid"] and elo_agrees(prob_a, elo_prob_a, max_gap=0.15):
+        if te_a["signal_valid"]:
             best_signal = {
                 "player": player_a, "odds": odds_a, "model_prob": prob_a,
                 "market_prob": te_a["implied_prob"],
                 **te_a,
-                "elo_prob": elo_prob_a,
+                "elo_prob": model.get("elo_prob_a"),
             }
 
     if b_in_range and odds_b > 0:
         te_b = calculate_true_edge(prob_b, odds_b)
-
-        if te_b["signal_valid"] and elo_agrees(prob_b, elo_prob_b, max_gap=0.15):
+        if te_b["signal_valid"]:
             if best_signal is None or te_b["true_edge_score"] > best_signal["true_edge_score"]:
                 best_signal = {
                     "player": player_b, "odds": odds_b, "model_prob": prob_b,
                     "market_prob": te_b["implied_prob"],
                     **te_b,
-                    "elo_prob": elo_prob_b,
+                    "elo_prob": 1.0 - model.get("elo_prob_a"),
                 }
 
     if best_signal is None:
