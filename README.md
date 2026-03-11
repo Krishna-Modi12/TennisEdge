@@ -6,7 +6,7 @@ A Telegram bot that detects value betting edges in tennis matches using surface-
 
 ## How It Works
 
-```
+```text
 Fetch Odds (AllSportsAPI)
         ↓
 4-Factor Model (Elo, Form, Surface, H2H)
@@ -61,13 +61,13 @@ Leave `MOCK_MODE=true` in your `.env` — the bot will use fake match data so yo
 
 To trigger a manual scan (as admin):
 
-```
+```text
 /scan
 ```
 
 To add credits to a user (as admin):
 
-```
+```text
 /addcredits <telegram_id> <amount>
 ```
 
@@ -89,7 +89,7 @@ To add credits to a user (as admin):
 
 ## File Structure
 
-```
+```text
 tennisedge/
 ├── bot.py                      ← main entry point
 ├── config.py                   ← all settings
