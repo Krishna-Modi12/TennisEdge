@@ -610,6 +610,9 @@ async def help_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         "Use /predict to get DeepSeek AI analysis on any upcoming match.\n\n"
         "*Signal Threshold*\n"
         "We send signals ONLY when Value Edge ≥ 4% AND the Model Win Probability ≥ 35%.\n\n"
+        "*Backtest Model*\n"
+        "Admin /backtest uses a leakage-safe point-in-time Elo simulation.\n"
+        "It is intentionally separate from the live 4-factor signal model.\n\n"
         "*Credits*\n"
         "Each signal costs 1 credit. Use /buy to top up.\n\n"
         "*Commands*\n"
@@ -679,7 +682,7 @@ async def addcredits(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def backtest_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """Admin: /backtest [atp_from] [atp_to] — run historical backtest."""
+    """Admin: /backtest [atp_from] [atp_to] — run point-in-time Elo backtest."""
     if not is_admin(update.effective_user.id):
         await update.message.reply_text("⛔ Admin only.")
         return
@@ -689,6 +692,7 @@ async def backtest_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(
         f"📊 Running backtest ({atp_from}-{atp_to})...\n"
+        f"Model: point-in-time Elo (leakage-safe)\n"
         f"This may take a few minutes."
     )
 

@@ -90,10 +90,13 @@ def _surface_from_tournament(tournament_name: str) -> str:
 def fetch_odds() -> list:
     """
     Returns list of match dicts with odds from AllSportsAPI.
-    Falls back to mock data if MOCK_MODE or API fails.
+    Uses mock data only when MOCK_MODE=true.
     """
-    if MOCK_MODE or not ODDS_API_KEY:
+    if MOCK_MODE:
         return _mock_odds()
+    if not ODDS_API_KEY:
+        print("[fetch_odds] ODDS_API_KEY missing and MOCK_MODE=false. Returning no live matches.")
+        return []
     result = _live_odds()
     if not result:
         print("[fetch_odds] Live API returned no matches.")

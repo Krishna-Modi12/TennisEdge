@@ -14,21 +14,26 @@ Usage:
 import argparse
 import datetime
 import io
-import sys
-from collections import defaultdict
+import math
 
 import pandas as pd
 import requests
 
-from models.advanced_model import advanced_predict
+from config import (
+    ELO_DEFAULT_RATING,
+    ELO_K_FACTOR,
+    SURFACE_ELO_WEIGHT,
+    MIN_VALUE_EDGE,
+    MIN_MODEL_PROB,
+)
 from database.db import init_schema
 
 
 # ── Core edge calculation (mirrors edge_detector.py logic) ───────────────────
 
 def calculate_true_edge(model_prob: float, decimal_odds: float,
-                        min_value_edge: float = 0.10,
-                        min_model_prob: float = 0.40) -> dict:
+                        min_value_edge: float = MIN_VALUE_EDGE,
+                        min_model_prob: float = MIN_MODEL_PROB) -> dict:
     implied_prob = 1.0 / decimal_odds
     value_edge = (model_prob * decimal_odds) - 1.0
     confidence = model_prob / (1.0 - model_prob) if model_prob < 1.0 else 99.0
@@ -69,27 +74,45 @@ def _normalize_surface(s) -> str:
             "carpet": "hard", "indoor": "hard"}.get(s, "hard")
 
 
+# ── Leakage-safe point-in-time Elo helpers ───────────────────────────────────
+
+def _expected_win_prob(rating_a: float, rating_b: float) -> float:
+    return 1.0 / (1.0 + math.pow(10, (rating_b - rating_a) / 400.0))
+
+
+def _get_rating(ratings: dict, player: str, surface: str) -> float:
+    return ratings.get((player, surface), ELO_DEFAULT_RATING)
+
+
+def _predict_point_in_time(ratings: dict, player_a: str, player_b: str, surface: str) -> dict:
+    overall_a = _get_rating(ratings, player_a, "overall")
+    overall_b = _get_rating(ratings, player_b, "overall")
+    surface_a = _get_rating(ratings, player_a, surface)
+    surface_b = _get_rating(ratings, player_b, surface)
+
+    blended_a = SURFACE_ELO_WEIGHT * surface_a + (1 - SURFACE_ELO_WEIGHT) * overall_a
+    blended_b = SURFACE_ELO_WEIGHT * surface_b + (1 - SURFACE_ELO_WEIGHT) * overall_b
+    prob_a = _expected_win_prob(blended_a, blended_b)
+    return {"prob_a": round(prob_a, 4), "prob_b": round(1.0 - prob_a, 4)}
+
+
+def _update_point_in_time(ratings: dict, winner: str, loser: str, surface: str):
+    for surf in ("overall", surface):
+        ra = _get_rating(ratings, winner, surf)
+        rb = _get_rating(ratings, loser, surf)
+        ea = _expected_win_prob(ra, rb)
+        ratings[(winner, surf)] = ra + ELO_K_FACTOR * (1 - ea)
+        ratings[(loser, surf)] = rb + ELO_K_FACTOR * (0 - (1 - ea))
+
+
 # ── Backtest Runner ──────────────────────────────────────────────────────────
 
 def backtest(atp_from=2023, atp_to=2024, wta_from=2023, wta_to=2024,
-             stake=100.0, min_value_edge=0.10, min_model_prob=0.40) -> dict:
+             stake=100.0, min_value_edge=MIN_VALUE_EDGE, min_model_prob=MIN_MODEL_PROB) -> dict:
     """
-    Run historical backtest using dual-validation edge system.
-    WARNING: This currently uses present-day database snapshots for form/H2H, 
-    introducing look-ahead bias. Performance metrics will be optimistic.
+    Run historical backtest using leakage-safe point-in-time Elo simulation.
     """
-    # Acknowledged: Antigravity — 2026-03-11
-    # Decision: point-in-time event sourcing deferred indefinitely.
-    # Mitigation: CLV tracking via paper trading is the primary live validator.
-    print("\n" + "!" * 75)
-    print("LOOK-AHEAD BIAS WARNING")
-    print("This backtest uses present-day player statistics and rankings, not")
-    print("point-in-time snapshots. Historical simulations before today")
-    print("will reflect data that did not exist at match time. ROI and win rate")
-    print("figures are optimistic by an unknown amount. Do not use these numbers")
-    print("as absolute performance targets — treat them as directional signals only.")
-    print("Validation via paper trading is mandatory before any real-money commitment.")
-    print("!" * 75 + "\n")
+    print("\n[Backtest] Using point-in-time Elo simulation (no look-ahead leakage).\n")
     
     all_matches = []
 
@@ -108,6 +131,10 @@ def backtest(atp_from=2023, atp_to=2024, wta_from=2023, wta_to=2024,
     if not all_matches:
         return {"message": "No match data found"}
 
+    # Chronological order is required for point-in-time simulation.
+    all_matches.sort(key=lambda m: m["date"])
+    ratings = {}
+
     # Run each match through the model
     results = []
     skipped = 0
@@ -115,7 +142,7 @@ def backtest(atp_from=2023, atp_to=2024, wta_from=2023, wta_to=2024,
 
     for i, m in enumerate(all_matches):
         try:
-            model = advanced_predict(m["winner"], m["loser"], m["surface"])
+            model = _predict_point_in_time(ratings, m["winner"], m["loser"], m["surface"])
 
             # Check both sides: winner and loser
             for player, odds, is_winner, prob in [
@@ -149,6 +176,9 @@ def backtest(atp_from=2023, atp_to=2024, wta_from=2023, wta_to=2024,
                     "won":             is_winner,
                     "profit":          round(profit, 2),
                 })
+
+            # Update ratings after processing the match outcome.
+            _update_point_in_time(ratings, m["winner"], m["loser"], m["surface"])
 
         except Exception as e:
             errors += 1
@@ -283,15 +313,9 @@ def format_backtest_report(result: dict) -> str:
         return f"⚠️ {result['message']}"
 
     msg = (
-        f"⚠️ *LOOK-AHEAD BIAS WARNING* ⚠️\n"
-        f"_This backtest uses present-day player statistics and rankings, not_\n"
-        f"_point-in-time snapshots. Historical simulations before today_\n"
-        f"_will reflect data that did not exist at match time. ROI and win rate_\n"
-        f"_figures are optimistic by an unknown amount. Do not use these numbers_\n"
-        f"_as absolute performance targets — treat them as directional signals only._\n"
-        f"_Validation via paper trading is mandatory before any real-money commitment._\n\n"
         f"📊 *BACKTEST RESULTS*\n"
         f"━━━━━━━━━━━━━━━━━━━\n\n"
+        f"🧮 *Model:* Point-in-time Elo (leakage-safe)\n\n"
         f"🎯 *Total Bets:* {result['total_bets']}\n"
         f"✅ *Wins:* {result['wins']} | ❌ *Losses:* {result['losses']}\n"
         f"📈 *Win Rate:* {result['win_rate']}\n\n"
@@ -328,8 +352,8 @@ if __name__ == "__main__":
     parser.add_argument("--wta-from", type=int, default=2023)
     parser.add_argument("--wta-to", type=int, default=2024)
     parser.add_argument("--stake", type=float, default=100.0)
-    parser.add_argument("--min-value-edge", type=float, default=0.10)
-    parser.add_argument("--min-model-prob", type=float, default=0.40)
+    parser.add_argument("--min-value-edge", type=float, default=MIN_VALUE_EDGE)
+    parser.add_argument("--min-model-prob", type=float, default=MIN_MODEL_PROB)
     args = parser.parse_args()
 
     print("Initializing database...")

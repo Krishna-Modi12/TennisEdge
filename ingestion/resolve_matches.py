@@ -1,4 +1,3 @@
-import time
 import requests
 import datetime
 import argparse
@@ -30,37 +29,66 @@ def parse_args():
     return parser.parse_args()
 
 
-def resolve_pending_signals():
-    """Fetch pending signals and resolve them if their match is finished."""
-    args = parse_args()
-
-    if args.force and not args.outcome:
-        print("ERROR: --force requires --outcome (WON, LOST, or VOID)")
+def _abort(message: str, cli_mode: bool):
+    if cli_mode:
+        print(f"ERROR: {message}")
         sys.exit(1)
-    if args.outcome and not args.force:
-        print("ERROR: --outcome requires --force SIGNAL_ID")
-        sys.exit(1)
+    logger.error(message)
 
-    if args.force:
+
+def resolve_pending_signals(
+    dry_run: bool = False,
+    force_signal_id: str | int | None = None,
+    forced_outcome: str | None = None,
+    cli_mode: bool = False,
+):
+    """Fetch pending signals and resolve them if their match is finished.
+
+    In scheduler/runtime usage this function must not exit the process.
+    In CLI usage (`cli_mode=True`) validation failures exit with code 1.
+    """
+    forced_outcome = forced_outcome.upper() if isinstance(forced_outcome, str) else None
+
+    if force_signal_id and not forced_outcome:
+        _abort("--force requires --outcome (WON, LOST, or VOID)", cli_mode)
+        return {"ok": False}
+    if forced_outcome and not force_signal_id:
+        _abort("--outcome requires --force SIGNAL_ID", cli_mode)
+        return {"ok": False}
+
+    if force_signal_id:
+        try:
+            sig_id = int(force_signal_id)
+        except (TypeError, ValueError):
+            _abort("--force SIGNAL_ID must be an integer", cli_mode)
+            return {"ok": False}
+
+        if forced_outcome not in {"WON", "LOST", "VOID"}:
+            _abort("--outcome must be one of WON, LOST, VOID", cli_mode)
+            return {"ok": False}
+
         # manual override
-        sig_id = int(args.force)
-        print(f"Forcing resolution for SIGNAL_ID {sig_id} to {args.outcome}...")
+        print(f"Forcing resolution for SIGNAL_ID {sig_id} to {forced_outcome}...")
         outcome_map = {"WON": "win", "LOST": "loss", "VOID": "push"}
-        if not args.dry_run:
-            update_signal_result(sig_id, outcome_map[args.outcome], "Manual Override")
+        if not dry_run:
+            update_signal_result(sig_id, outcome_map[forced_outcome], "Manual Override")
             print(f"Successfully resolved SIGNAL_ID {sig_id}")
         else:
-            print(f"[DRY-RUN] Would have resolved SIGNAL_ID {sig_id} as {args.outcome}")
-        return
+            print(f"[DRY-RUN] Would have resolved SIGNAL_ID {sig_id} as {forced_outcome}")
+        return {"ok": True, "resolved": 1, "won": 0, "lost": 0, "voided": 0, "pending": 0}
 
     if not ODDS_API_KEY:
-        print("ERROR: ODDS_API_KEY not set.")
-        sys.exit(1)
+        msg = "ODDS_API_KEY not set."
+        if cli_mode:
+            _abort(msg, cli_mode=True)
+        else:
+            logger.warning(f"{msg} Skipping pending signal resolution.")
+        return {"ok": False}
         
     pending = get_pending_signals(max_age_days=7)
     if not pending:
         print("No pending signals to resolve.")
-        return
+        return {"ok": True, "resolved": 0, "won": 0, "lost": 0, "voided": 0, "pending": 0}
 
     print(f"Checking results for {len(pending)} pending signals...")
     
@@ -132,14 +160,14 @@ def resolve_pending_signals():
                         lost += 1
                         
                     resolved_ids.add(sig["id"])
-                    if not args.dry_run:
+                    if not dry_run:
                         update_signal_result(sig["id"], result, actual_winner)
                     else:
                         print(f"[DRY-RUN] SIGNAL_ID {sig['id']}: Match {match_id} Finished -> {result.upper()} (Winner: {actual_winner})")
                         
             elif status in ("Cancelled", "Retired"):
                 resolved_ids.add(sig["id"])
-                if not args.dry_run:
+                if not dry_run:
                     update_signal_result(sig["id"], "push", None)
                 else:
                     print(f"[DRY-RUN] SIGNAL_ID {sig['id']}: Match {match_id} {status} -> VOID")
@@ -173,5 +201,20 @@ def resolve_pending_signals():
         except Exception:
             pass
 
+    return {
+        "ok": True,
+        "resolved": total_resolved,
+        "won": won,
+        "lost": lost,
+        "voided": voided,
+        "pending": still_pending,
+    }
+
 if __name__ == "__main__":
-    resolve_pending_signals()
+    args = parse_args()
+    resolve_pending_signals(
+        dry_run=args.dry_run,
+        force_signal_id=args.force,
+        forced_outcome=args.outcome,
+        cli_mode=True,
+    )

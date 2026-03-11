@@ -19,6 +19,12 @@ If Value Edge ≥ 4% and Model Prob ≥ 35% → Send Signal via Telegram
 Deduct 1 Credit from User
 ```
 
+### Backtest Model
+
+`/backtest` now runs a leakage-safe, point-in-time Elo simulation.
+It does **not** use the full live 4-factor model (form/surface/H2H blend).
+Use paper trading metrics as the primary validator for live behavior.
+
 ---
 
 ## Setup
@@ -87,6 +93,7 @@ To add credits to a user (as admin):
 | /help | How it works |
 | /scan | (Admin) Run pipeline now |
 | /addcredits | (Admin) Add credits manually |
+| /backtest | (Admin) Point-in-time Elo backtest |
 
 ---
 
