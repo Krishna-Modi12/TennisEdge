@@ -78,12 +78,18 @@ def backtest(atp_from=2023, atp_to=2024, wta_from=2023, wta_to=2024,
     WARNING: This currently uses present-day database snapshots for form/H2H, 
     introducing look-ahead bias. Performance metrics will be optimistic.
     """
-    print("\n" + "!" * 60)
-    print("WARNING: METHODOLOGICAL LEAK DETECTED")
-    print("This backtest uses the current DB-backed model which")
-    print("computes a present-day snapshot of player stats.")
-    print("This introduces look-ahead bias. ROI is optimistic.")
-    print("!" * 60 + "\n")
+    # Acknowledged: Antigravity — 2026-03-11
+    # Decision: point-in-time event sourcing deferred indefinitely.
+    # Mitigation: CLV tracking via paper trading is the primary live validator.
+    print("\n" + "!" * 75)
+    print("LOOK-AHEAD BIAS WARNING")
+    print("This backtest uses present-day player statistics and rankings, not")
+    print("point-in-time snapshots. Historical simulations before today")
+    print("will reflect data that did not exist at match time. ROI and win rate")
+    print("figures are optimistic by an unknown amount. Do not use these numbers")
+    print("as absolute performance targets — treat them as directional signals only.")
+    print("Validation via paper trading is mandatory before any real-money commitment.")
+    print("!" * 75 + "\n")
     
     all_matches = []
 
@@ -277,9 +283,13 @@ def format_backtest_report(result: dict) -> str:
         return f"⚠️ {result['message']}"
 
     msg = (
-        f"⚠️ *WARNING: METHODOLOGICAL LEAK* ⚠️\n"
-        f"_This backtest uses present-day database snapshots rather than point-in-time logic._\n"
-        f"_Results suffer from look-ahead bias and are inherently optimistic._\n\n"
+        f"⚠️ *LOOK-AHEAD BIAS WARNING* ⚠️\n"
+        f"_This backtest uses present-day player statistics and rankings, not_\n"
+        f"_point-in-time snapshots. Historical simulations before today_\n"
+        f"_will reflect data that did not exist at match time. ROI and win rate_\n"
+        f"_figures are optimistic by an unknown amount. Do not use these numbers_\n"
+        f"_as absolute performance targets — treat them as directional signals only._\n"
+        f"_Validation via paper trading is mandatory before any real-money commitment._\n\n"
         f"📊 *BACKTEST RESULTS*\n"
         f"━━━━━━━━━━━━━━━━━━━\n\n"
         f"🎯 *Total Bets:* {result['total_bets']}\n"
