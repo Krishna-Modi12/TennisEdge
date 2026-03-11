@@ -1,0 +1,256 @@
+2026-03-11 17:55:48,904 ERROR cache_get_failed: connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+Traceback (most recent call last):
+  File "C:\Users\krish\OneDrive\Desktop\BOT\TennisEdge-New\integrations\tennis_api.py", line 46, in _cache_get
+    conn = get_conn()
+  File "C:\Users\krish\OneDrive\Desktop\BOT\TennisEdge-New\database\db.py", line 60, in get_conn
+    raw = psycopg2.connect(DATABASE_URL)
+  File "C:\Users\krish\AppData\Local\Programs\Python\Python310\lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+2026-03-11 17:55:53,018 ERROR search_player_failed: connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+Traceback (most recent call last):
+  File "C:\Users\krish\OneDrive\Desktop\BOT\TennisEdge-New\integrations\tennis_api.py", line 184, in search_player
+    conn = get_conn()
+  File "C:\Users\krish\OneDrive\Desktop\BOT\TennisEdge-New\database\db.py", line 60, in get_conn
+    raw = psycopg2.connect(DATABASE_URL)
+  File "C:\Users\krish\AppData\Local\Programs\Python\Python310\lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+2026-03-11 17:55:57,112 ERROR cache_get_failed: connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+Traceback (most recent call last):
+  File "C:\Users\krish\OneDrive\Desktop\BOT\TennisEdge-New\integrations\tennis_api.py", line 46, in _cache_get
+    conn = get_conn()
+  File "C:\Users\krish\OneDrive\Desktop\BOT\TennisEdge-New\database\db.py", line 60, in get_conn
+    raw = psycopg2.connect(DATABASE_URL)
+  File "C:\Users\krish\AppData\Local\Programs\Python\Python310\lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+2026-03-11 17:56:01,218 ERROR cache_get_failed: connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+Traceback (most recent call last):
+  File "C:\Users\krish\OneDrive\Desktop\BOT\TennisEdge-New\integrations\tennis_api.py", line 46, in _cache_get
+    conn = get_conn()
+  File "C:\Users\krish\OneDrive\Desktop\BOT\TennisEdge-New\database\db.py", line 60, in get_conn
+    raw = psycopg2.connect(DATABASE_URL)
+  File "C:\Users\krish\AppData\Local\Programs\Python\Python310\lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+2026-03-11 17:56:05,306 ERROR search_player_failed: connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+Traceback (most recent call last):
+  File "C:\Users\krish\OneDrive\Desktop\BOT\TennisEdge-New\integrations\tennis_api.py", line 184, in search_player
+    conn = get_conn()
+  File "C:\Users\krish\OneDrive\Desktop\BOT\TennisEdge-New\database\db.py", line 60, in get_conn
+    raw = psycopg2.connect(DATABASE_URL)
+  File "C:\Users\krish\AppData\Local\Programs\Python\Python310\lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+2026-03-11 17:56:09,333 ERROR cache_get_failed: connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+Traceback (most recent call last):
+  File "C:\Users\krish\OneDrive\Desktop\BOT\TennisEdge-New\integrations\tennis_api.py", line 46, in _cache_get
+    conn = get_conn()
+  File "C:\Users\krish\OneDrive\Desktop\BOT\TennisEdge-New\database\db.py", line 60, in get_conn
+    raw = psycopg2.connect(DATABASE_URL)
+  File "C:\Users\krish\AppData\Local\Programs\Python\Python310\lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+2026-03-11 17:56:13,441 ERROR cache_get_failed: connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+Traceback (most recent call last):
+  File "C:\Users\krish\OneDrive\Desktop\BOT\TennisEdge-New\integrations\tennis_api.py", line 46, in _cache_get
+    conn = get_conn()
+  File "C:\Users\krish\OneDrive\Desktop\BOT\TennisEdge-New\database\db.py", line 60, in get_conn
+    raw = psycopg2.connect(DATABASE_URL)
+  File "C:\Users\krish\AppData\Local\Programs\Python\Python310\lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+2026-03-11 17:56:17,509 ERROR search_player_failed: connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+Traceback (most recent call last):
+  File "C:\Users\krish\OneDrive\Desktop\BOT\TennisEdge-New\integrations\tennis_api.py", line 184, in search_player
+    conn = get_conn()
+  File "C:\Users\krish\OneDrive\Desktop\BOT\TennisEdge-New\database\db.py", line 60, in get_conn
+    raw = psycopg2.connect(DATABASE_URL)
+  File "C:\Users\krish\AppData\Local\Programs\Python\Python310\lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+2026-03-11 17:56:21,598 ERROR cache_get_failed: connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+Traceback (most recent call last):
+  File "C:\Users\krish\OneDrive\Desktop\BOT\TennisEdge-New\integrations\tennis_api.py", line 46, in _cache_get
+    conn = get_conn()
+  File "C:\Users\krish\OneDrive\Desktop\BOT\TennisEdge-New\database\db.py", line 60, in get_conn
+    raw = psycopg2.connect(DATABASE_URL)
+  File "C:\Users\krish\AppData\Local\Programs\Python\Python310\lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+2026-03-11 17:56:25,654 ERROR search_player_failed: connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+Traceback (most recent call last):
+  File "C:\Users\krish\OneDrive\Desktop\BOT\TennisEdge-New\integrations\tennis_api.py", line 184, in search_player
+    conn = get_conn()
+  File "C:\Users\krish\OneDrive\Desktop\BOT\TennisEdge-New\database\db.py", line 60, in get_conn
+    raw = psycopg2.connect(DATABASE_URL)
+  File "C:\Users\krish\AppData\Local\Programs\Python\Python310\lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+2026-03-11 17:56:29,710 ERROR cache_get_failed: connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+Traceback (most recent call last):
+  File "C:\Users\krish\OneDrive\Desktop\BOT\TennisEdge-New\integrations\tennis_api.py", line 46, in _cache_get
+    conn = get_conn()
+  File "C:\Users\krish\OneDrive\Desktop\BOT\TennisEdge-New\database\db.py", line 60, in get_conn
+    raw = psycopg2.connect(DATABASE_URL)
+  File "C:\Users\krish\AppData\Local\Programs\Python\Python310\lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+2026-03-11 17:56:33,797 ERROR cache_get_failed: connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+Traceback (most recent call last):
+  File "C:\Users\krish\OneDrive\Desktop\BOT\TennisEdge-New\integrations\tennis_api.py", line 46, in _cache_get
+    conn = get_conn()
+  File "C:\Users\krish\OneDrive\Desktop\BOT\TennisEdge-New\database\db.py", line 60, in get_conn
+    raw = psycopg2.connect(DATABASE_URL)
+  File "C:\Users\krish\AppData\Local\Programs\Python\Python310\lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+2026-03-11 17:56:37,863 ERROR search_player_failed: connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+Traceback (most recent call last):
+  File "C:\Users\krish\OneDrive\Desktop\BOT\TennisEdge-New\integrations\tennis_api.py", line 184, in search_player
+    conn = get_conn()
+  File "C:\Users\krish\OneDrive\Desktop\BOT\TennisEdge-New\database\db.py", line 60, in get_conn
+    raw = psycopg2.connect(DATABASE_URL)
+  File "C:\Users\krish\AppData\Local\Programs\Python\Python310\lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+2026-03-11 17:56:41,953 ERROR cache_get_failed: connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+Traceback (most recent call last):
+  File "C:\Users\krish\OneDrive\Desktop\BOT\TennisEdge-New\integrations\tennis_api.py", line 46, in _cache_get
+    conn = get_conn()
+  File "C:\Users\krish\OneDrive\Desktop\BOT\TennisEdge-New\database\db.py", line 60, in get_conn
+    raw = psycopg2.connect(DATABASE_URL)
+  File "C:\Users\krish\AppData\Local\Programs\Python\Python310\lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+2026-03-11 17:56:46,054 ERROR cache_get_failed: connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+Traceback (most recent call last):
+  File "C:\Users\krish\OneDrive\Desktop\BOT\TennisEdge-New\integrations\tennis_api.py", line 46, in _cache_get
+    conn = get_conn()
+  File "C:\Users\krish\OneDrive\Desktop\BOT\TennisEdge-New\database\db.py", line 60, in get_conn
+    raw = psycopg2.connect(DATABASE_URL)
+  File "C:\Users\krish\AppData\Local\Programs\Python\Python310\lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+
+2026-03-11 17:56:50,143 ERROR search_player_failed: connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+Traceback (most recent call last):
+  File "C:\Users\krish\OneDrive\Desktop\BOT\TennisEdge-New\integrations\tennis_api.py", line 184, in search_player
+    conn = get_conn()
+  File "C:\Users\krish\OneDrive\Desktop\BOT\TennisEdge-New\database\db.py", line 60, in get_conn
+    raw = psycopg2.connect(DATABASE_URL)
+  File "C:\Users\krish\AppData\Local\Programs\Python\Python310\lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: connection to server at "localhost" (::1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused (0x0000274D/10061)
+	Is the server running on that host and accepting TCP/IP connections?
+

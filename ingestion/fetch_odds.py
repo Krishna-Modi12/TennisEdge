@@ -104,44 +104,47 @@ def fetch_odds() -> list:
     return result
 
 
-def _live_odds() -> list:
-    today = datetime.date.today()
-    tomorrow = today + datetime.timedelta(days=1)
-    date_from = today.strftime("%Y-%m-%d")
-    date_to = tomorrow.strftime("%Y-%m-%d")
+def _safe_float(v):
+    try:
+        fv = float(v)
+    except (TypeError, ValueError):
+        return None
+    return fv if fv > 1.0 else None
 
-    # Step 1: Fetch fixtures (today + tomorrow)
-    fixtures = _fetch_fixtures(date_from, date_to)
-    if not fixtures:
-        return []
 
-    # Filter: singles only, upcoming (not finished), ATP/WTA/Challenger
-    upcoming = []
-    for f in fixtures:
-        country = f.get("country_name", "")
-        if "Doubles" in country:
-            continue
-        status = f.get("event_status", "")
-        if status == "Finished" or status == "Cancelled":
-            continue
-        upcoming.append(f)
+def _best_available_odds(book_odds: dict) -> float | None:
+    if not isinstance(book_odds, dict):
+        return None
+    vals = [_safe_float(v) for v in book_odds.values()]
+    valid = [v for v in vals if v is not None]
+    return max(valid) if valid else None
 
-    if not upcoming:
-        print("[fetch_odds] No upcoming singles fixtures found.")
-        return []
 
-    # Step 2: Fetch odds for today+tomorrow
-    odds_map = _fetch_odds_map(date_from, date_to)
+def _extract_pinnacle_odds(book_odds: dict) -> float | None:
+    """
+    Extract Pinnacle price from bookmaker map.
+    Priority:
+      1) explicit Pinnacle/Pinny labels
+      2) PS-prefixed labels (common shorthand in odds datasets)
+    """
+    if not isinstance(book_odds, dict):
+        return None
 
-    # Step 3: Combine fixtures + odds
-    all_matches = []
-    for f in upcoming:
-        event_key = str(f["event_key"])
-        player_a = f.get("event_first_player", "Unknown")
-        player_b = f.get("event_second_player", "Unknown")
-        tournament = f.get("league_name", "Unknown")
-        surface = _surface_from_tournament(tournament)
-    return result
+    for k, v in book_odds.items():
+        key = str(k).strip().lower()
+        if "pinnacle" in key or "pinny" in key:
+            odds = _safe_float(v)
+            if odds is not None:
+                return odds
+
+    for k, v in book_odds.items():
+        key = str(k).strip().lower()
+        if key.startswith("ps"):
+            odds = _safe_float(v)
+            if odds is not None:
+                return odds
+
+    return None
 
 
 def _live_odds() -> list:
@@ -193,20 +196,10 @@ def _live_odds() -> list:
             ha = odds_map[event_key].get("Home/Away", {})
             home_odds = ha.get("Home", {})
             away_odds = ha.get("Away", {})
-            # Pick best (highest) odds across bookmakers
-            if home_odds:
-                odds_a = max(float(v) for v in home_odds.values())
-                # Extract Pinnacle odds if available (Pinnacle or PS or Pinny)
-                for k, v in home_odds.items():
-                    if "pinnacle" in str(k).lower():
-                        pinny_a = float(v)
-                        break
-            if away_odds:
-                odds_b = max(float(v) for v in away_odds.values())
-                for k, v in away_odds.items():
-                    if "pinnacle" in str(k).lower():
-                        pinny_b = float(v)
-                        break
+            odds_a = _best_available_odds(home_odds)
+            odds_b = _best_available_odds(away_odds)
+            pinny_a = _extract_pinnacle_odds(home_odds)
+            pinny_b = _extract_pinnacle_odds(away_odds)
 
         # If no odds available, use placeholder
         if not odds_a or not odds_b:
@@ -221,8 +214,8 @@ def _live_odds() -> list:
             "surface":    surface,
             "odds_a":     round(odds_a, 2),
             "odds_b":     round(odds_b, 2),
-            "pinny_odds_a": round(pinny_a, 2) if pinny_a else None,
-            "pinny_odds_b": round(pinny_b, 2) if pinny_b else None,
+            "pinny_odds_a": round(pinny_a, 2) if pinny_a is not None else None,
+            "pinny_odds_b": round(pinny_b, 2) if pinny_b is not None else None,
             "event_date": event_date,
             "event_time": event_time,
             "status":     f.get("event_status", ""),

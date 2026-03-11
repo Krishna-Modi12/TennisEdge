@@ -140,6 +140,11 @@ _SCHEMA_STATEMENTS = [
         alias          TEXT PRIMARY KEY,
         canonical_name TEXT NOT NULL
     )""",
+    """CREATE TABLE IF NOT EXISTS api_cache (
+        key        TEXT PRIMARY KEY,
+        value      JSONB,
+        expires_at TIMESTAMP
+    )""",
     """CREATE TABLE IF NOT EXISTS matches (
         id          SERIAL PRIMARY KEY,
         date        TEXT,
@@ -305,6 +310,35 @@ def get_subscribers_with_info() -> list:
             {"id": r[0], "telegram_id": r[1], "username": r[2], "credits": r[3]}
             for r in cur.fetchall()
         ]
+    except Exception:
+        conn.rollback()
+        raise
+
+
+def deduct_credit_atomic(telegram_id: int) -> bool:
+    """
+    Atomically deduct one credit using SELECT ... FOR UPDATE.
+    Returns False when user does not exist or has insufficient credits.
+    """
+    conn = get_conn()
+    try:
+        cur = conn.execute(
+            "SELECT id, credits FROM users WHERE telegram_id = %s FOR UPDATE",
+            (telegram_id,),
+        )
+        row = cur.fetchone()
+        if not row:
+            conn.rollback()
+            return False
+
+        user_id, credits = row
+        if (credits or 0) < 1:
+            conn.rollback()
+            return False
+
+        conn.execute("UPDATE users SET credits = credits - 1 WHERE id = %s", (user_id,))
+        conn.commit()
+        return True
     except Exception:
         conn.rollback()
         raise
@@ -774,6 +808,20 @@ def update_signal_result(
                 "recorded_at = NOW()",
                 (signal_id,),
             )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+
+
+def update_signal_closing_odds(signal_id: int, closing_odds: float):
+    """Set closing_odds for a signal without modifying the stored result."""
+    conn = get_conn()
+    try:
+        conn.execute(
+            "UPDATE signals SET closing_odds=%s WHERE id=%s",
+            (closing_odds, signal_id),
+        )
         conn.commit()
     except Exception:
         conn.rollback()

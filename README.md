@@ -144,6 +144,14 @@ tennisedge/
   - `python paper_trading_status.py`
   - JSON mode: `python paper_trading_status.py --json`
 
+### Sprint 2 Tooling
+
+- Elo calibration diagnostics: `python -m tennis_backtest.elo_calibration_check`
+- Baseline probability build: `python -m tennis_backtest.step4b_baseline_probs --input <in.csv> --output <out.csv>`
+- Elo K sweep: `python -m tennis_backtest.elo_k_calibration --input-csv <out.csv>`
+- Backtest wrapper: `python -m tennis_backtest.step6_backtest_v2`
+- Hard-stop pipeline runner: `python -m tennis_backtest.run_sprint2_pipeline --input-csv <in.csv>`
+
 ### Render Cron (Daily Elo Update)
 
 Add a Render Cron Job to keep Elo ratings updated from finished matches:

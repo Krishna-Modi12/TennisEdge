@@ -127,3 +127,59 @@ def format_signal_list(signals: list) -> str:
         )
 
     return "\n".join(lines)
+
+
+def format_match_card(match: dict, model: dict, api_stats: dict = None) -> str:
+    """
+    match keys: player_a, player_b, surface, tournament, odds_a, odds_b
+    model keys: prob_a, prob_b, true_edge_score (or edge), elo_prob_a,
+                form_prob_a, surface_prob_a, h2h_prob_a
+    api_stats: from get_player_stats(), may be None
+    """
+    from models.match_helpers import fair_odds, kelly_stake, confidence_tier, format_prob
+
+    # Get bet-on player (higher probability)
+    if model.get("prob_a", 0.5) >= model.get("prob_b", 0.5):
+        bet_player = match["player_a"]
+        bet_prob = model.get("prob_a", 0.5)
+        bet_odds = match.get("odds_a", 0)
+    else:
+        bet_player = match["player_b"]
+        bet_prob = model.get("prob_b", 0.5)
+        bet_odds = match.get("odds_b", 0)
+
+    true_edge = model.get("true_edge_score", model.get("edge", 0))
+    fo = fair_odds(bet_prob)
+    kelly = kelly_stake(bet_prob, bet_odds)
+    tier = confidence_tier(true_edge, bet_prob)
+    edge_pct = round(true_edge * 100, 1)
+
+    lines = [
+        f"🎾 *{_escape(match['player_a'])} vs {_escape(match['player_b'])}*",
+        f"🏟 {_escape(match.get('tournament', ''))} | {_escape(match.get('surface', '').title())}",
+        "",
+        "📊 *Stats Breakdown:*",
+        f"Bet On: {_escape(str(bet_player))}",
+        f"Our Probability: {format_prob(bet_prob)}",
+        f"Market Odds: {_escape(str(bet_odds))}",
+        f"Fair Odds: {_escape(str(fo)) if fo else 'N/A'}",
+        f"Profit Potential: +{_escape(str(edge_pct))}%",
+        f"Confidence: {tier}",
+        "💰 *Bankroll Strategy:*",
+        f"Recommended Stake: {_escape(str(kelly))}% (Quarter Kelly)",
+    ]
+
+    # Add API stats only if available
+    if api_stats:
+        lines.append("📡 *Serve Stats:*")
+        fields = [
+            ("1st Serve Won", api_stats.get("first_serve_won_pct")),
+            ("2nd Serve Won", api_stats.get("second_serve_won_pct")),
+            ("BP Saved", api_stats.get("break_points_saved_pct")),
+            ("Return Won", api_stats.get("return_points_won_pct")),
+        ]
+        for label, val in fields:
+            if val is not None:
+                lines.append(f"{label}: {format_prob(val)}")
+
+    return "\n".join(lines)

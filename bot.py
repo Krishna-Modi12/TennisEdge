@@ -79,13 +79,27 @@ try:
     from database.db import (
         init_schema, get_or_create_user, get_user,
         add_credits_manual, get_recent_signals,
-        get_all_user_telegram_ids,
+        get_all_user_telegram_ids, deduct_credit_atomic,
     )
     print("  database.db OK", flush=True)
 
     _startup_status = "import: signals.formatter"
-    from signals.formatter import format_signal_list
+    from signals.formatter import format_signal_list, format_match_card
     print("  signals.formatter OK", flush=True)
+
+    _startup_status = "import: integrations.tennis_api"
+    from integrations.tennis_api import (
+        get_player_stats, get_h2h_stats,
+        get_current_tournament_form, get_player_ranking,
+    )
+    print("  integrations.tennis_api OK", flush=True)
+
+    _startup_status = "import: models.match_helpers"
+    from models.match_helpers import (
+        fair_odds, kelly_stake, confidence_tier,
+        total_games_probability, format_prob,
+    )
+    print("  models.match_helpers OK", flush=True)
 
     _startup_status = "import: scheduler.job"
     from scheduler.job import start_scheduler, run_pipeline, set_bot, set_loop
@@ -131,6 +145,20 @@ async def post_init(app: Application) -> None:
     logger.info("post_init: live event loop captured for scheduler.")
 
 
+def _main_menu_keyboard():
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("🎯 Predictions", callback_data="menu_predictions"),
+            InlineKeyboardButton("🔥 Value Bets", callback_data="menu_vbets"),
+        ],
+        [
+            InlineKeyboardButton("📊 Total Games", callback_data="menu_tgames"),
+            InlineKeyboardButton("💰 My Wallet", callback_data="menu_wallet"),
+        ],
+        [InlineKeyboardButton("📚 Knowledge Base", callback_data="menu_kb")],
+    ])
+
+
 # ── /start ────────────────────────────────────────────────────────────────────
 
 async def start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -153,7 +181,23 @@ async def start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         f"/help \\– How it works\n\n"
         f"_Each signal costs 1 credit\\._"
     )
-    await update.message.reply_text(welcome, parse_mode="Markdown")
+    await update.message.reply_text(
+        welcome,
+        parse_mode="Markdown",
+        reply_markup=_main_menu_keyboard(),
+    )
+
+
+async def menu_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    db_user = get_or_create_user(user.id, user.username)
+    await update.message.reply_text(
+        f"🎾 *TennisEdge Menu*\n"
+        f"Credits: *{db_user['credits']}*\n"
+        f"Choose an option:",
+        parse_mode="Markdown",
+        reply_markup=_main_menu_keyboard(),
+    )
 
 
 # ── /balance ──────────────────────────────────────────────────────────────────
@@ -269,7 +313,8 @@ async def signals(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 async def matches(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("⏳ Fetching live matches...")
     try:
-        match_list = fetch_odds()
+        loop = asyncio.get_running_loop()
+        match_list = await loop.run_in_executor(None, fetch_odds)
     except Exception as e:
         await update.message.reply_text(f"❌ Failed to fetch matches: {e}")
         return
@@ -399,7 +444,8 @@ async def predict(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     """Interactive AI prediction: show upcoming matches as buttons."""
     await update.message.reply_text("🤖 Fetching matches for AI prediction...")
     try:
-        match_list = fetch_odds()
+        loop = asyncio.get_running_loop()
+        match_list = await loop.run_in_executor(None, fetch_odds)
     except Exception as e:
         await update.message.reply_text(f"❌ Failed to fetch matches: {e}")
         return
@@ -607,6 +653,536 @@ async def predict_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             )
         except Exception:
             pass
+
+
+# ── /menu callbacks ───────────────────────────────────────────────────────────
+
+async def menu_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    data = query.data
+
+    if data == "menu_predictions":
+        await query.edit_message_text(
+            "🎾 Select a tour:",
+            reply_markup=InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("ATP", callback_data="tour_sel_atp"),
+                    InlineKeyboardButton("WTA", callback_data="tour_sel_wta"),
+                ],
+                [InlineKeyboardButton("🏠 Home", callback_data="menu_home")],
+            ]),
+        )
+
+    elif data == "menu_vbets":
+        await query.edit_message_text("🔎 Scanning for value bets...")
+        loop = asyncio.get_running_loop()
+        try:
+            match_list = await loop.run_in_executor(None, fetch_odds)
+            from signals.edge_detector import detect_edges
+            signals = await loop.run_in_executor(None, detect_edges, match_list)
+        except Exception as e:
+            logger.error(f"Value bets error: {e}")
+            signals = []
+
+        if not signals:
+            await query.edit_message_text(
+                "🔥 *Top Value Bets Today*\n\n"
+                "No high-value signals right now.\n"
+                "Check back later!",
+                parse_mode="Markdown",
+                reply_markup=InlineKeyboardMarkup([
+                    [
+                        InlineKeyboardButton("🔄 Refresh", callback_data="menu_vbets"),
+                        InlineKeyboardButton("🏠 Home", callback_data="menu_home"),
+                    ]
+                ]),
+            )
+            return
+
+        ctx.user_data["vbets_signals"] = signals
+        top5 = sorted(
+            signals,
+            key=lambda x: x.get("true_edge_score", x.get("edge", 0)),
+            reverse=True,
+        )[:5]
+
+        buttons = []
+        for i, s in enumerate(top5):
+            edge_pct = round(s.get("true_edge_score", s.get("edge", 0)) * 100, 1)
+            label = f"{s.get('bet_on', '')[:15]} @ {s.get('odds')} | Edge: {edge_pct}%"
+            buttons.append([InlineKeyboardButton(label, callback_data=f"vbets_{i}")])
+        buttons.append(
+            [
+                InlineKeyboardButton("🔄 Refresh", callback_data="menu_vbets"),
+                InlineKeyboardButton("🏠 Home", callback_data="menu_home"),
+            ]
+        )
+        await query.edit_message_text(
+            "🔥 *Top Value Bets Today*",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(buttons),
+        )
+
+    elif data == "menu_tgames":
+        await query.edit_message_text("📊 Loading total games market...")
+        loop = asyncio.get_running_loop()
+        try:
+            match_list = await loop.run_in_executor(None, fetch_odds)
+        except Exception:
+            await query.edit_message_text(
+                "Failed to load matches.",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🏠 Home", callback_data="menu_home")]
+                ]),
+            )
+            return
+
+        tg_matches = []
+        for m in match_list:
+            stats_a = get_player_stats(m["player_a"])
+            stats_b = get_player_stats(m["player_b"])
+            if stats_a and stats_b:
+                probs = total_games_probability(
+                    stats_a.get("first_serve_won_pct"),
+                    stats_b.get("first_serve_won_pct"),
+                    stats_a.get("second_serve_won_pct"),
+                    stats_b.get("second_serve_won_pct"),
+                )
+                if probs:
+                    tg_matches.append({"match": m, "probs": probs})
+
+        tg_matches.sort(key=lambda x: x["probs"]["over"], reverse=True)
+        ctx.user_data["tg_matches"] = tg_matches
+
+        if not tg_matches:
+            await query.edit_message_text(
+                "📊 Serve stats loading.\nCheck back soon!",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🏠 Home", callback_data="menu_home")]
+                ]),
+            )
+            return
+
+        buttons = []
+        for i, item in enumerate(tg_matches[:15]):
+            m = item["match"]
+            over = round(item["probs"]["over"] * 100, 0)
+            label = f"{m['player_a'][:12]} vs {m['player_b'][:12]} | O22.5: {int(over)}%"
+            buttons.append([InlineKeyboardButton(label, callback_data=f"tgames_{i}")])
+        buttons.append([InlineKeyboardButton("🏠 Home", callback_data="menu_home")])
+        await query.edit_message_text(
+            "📊 *Total Games Market*",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(buttons),
+        )
+
+    elif data == "menu_wallet":
+        user = update.effective_user
+        db_user = get_or_create_user(user.id, user.username)
+        await query.edit_message_text(
+            f"💳 *Your Credits*\n\n"
+            f"Balance: *{db_user['credits']}* credits\n\n"
+            f"Usage:\n"
+            f"Signal / Analysis = 1 credit\n"
+            f"Browsing & lists = free",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("💳 Buy Credits", callback_data="menu_buycredits")],
+                [InlineKeyboardButton("⬅ Back", callback_data="menu_home")],
+            ]),
+        )
+
+    elif data == "menu_buycredits":
+        keyboard = []
+        for key, pkg in CREDIT_PACKAGES.items():
+            label = f"{key.upper()} – {pkg['credits']} credits @ ₹{pkg['price_inr']}"
+            keyboard.append([InlineKeyboardButton(label, callback_data=f"buy_{key}")])
+        keyboard.append([InlineKeyboardButton("⬅ Back", callback_data="menu_wallet")])
+        await query.edit_message_text(
+            "💳 *Purchase Credits*\n\nChoose a package:",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
+
+    elif data == "menu_kb":
+        await query.edit_message_text(
+            "📚 *TennisEdge Knowledge Base*\n\nSelect a topic:",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🤖 How Our AI Works", callback_data="kb_how")],
+                [InlineKeyboardButton("📈 Understanding Edge & EV", callback_data="kb_edge")],
+                [InlineKeyboardButton("💰 Kelly Criterion", callback_data="kb_kelly")],
+                [InlineKeyboardButton("⬅ Back to Menu", callback_data="menu_home")],
+            ]),
+        )
+
+    elif data == "menu_home":
+        user = update.effective_user
+        db_user = get_or_create_user(user.id, user.username)
+        await query.edit_message_text(
+            f"🎾 *TennisEdge Menu*\n"
+            f"Credits: *{db_user['credits']}*\n"
+            f"Choose an option:",
+            parse_mode="Markdown",
+            reply_markup=_main_menu_keyboard(),
+        )
+
+
+async def tour_sel_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    tour = query.data.split("_")[2]  # atp or wta
+    ctx.user_data["menu_tour"] = tour
+    await query.edit_message_text(f"Loading {tour.upper()} matches...")
+
+    loop = asyncio.get_running_loop()
+    try:
+        all_matches = await loop.run_in_executor(None, fetch_odds)
+    except Exception:
+        await query.edit_message_text(
+            "Failed to fetch matches. Try again.",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🏠 Home", callback_data="menu_home")]
+            ]),
+        )
+        return
+
+    filtered = [
+        m for m in all_matches
+        if tour in str(m.get("sport_key", "")).lower()
+        or tour in str(m.get("tournament", "")).lower()
+    ]
+    if not filtered:
+        filtered = all_matches
+    ctx.user_data["menu_matches"] = filtered
+
+    if not filtered:
+        await query.edit_message_text(
+            "📭 No matches available right now.\nCheck back later!",
+            reply_markup=InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("⬅ Back", callback_data="menu_predictions"),
+                    InlineKeyboardButton("🏠 Home", callback_data="menu_home"),
+                ]
+            ]),
+        )
+        return
+
+    buttons = []
+    for i, m in enumerate(filtered[:20]):
+        label = f"🎾 {m['player_a'][:15]} vs {m['player_b'][:15]}"
+        buttons.append([InlineKeyboardButton(label, callback_data=f"match_sel_{i}")])
+    buttons.append([
+        InlineKeyboardButton("⬅ Back", callback_data="menu_predictions"),
+        InlineKeyboardButton("🏠 Home", callback_data="menu_home"),
+    ])
+
+    await query.edit_message_text(
+        f"🎾 *{tour.upper()} Matches:*",
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(buttons),
+    )
+
+
+async def match_sel_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    idx = int(query.data.split("_")[2])
+    menu_matches = ctx.user_data.get("menu_matches", [])
+
+    if not menu_matches or idx >= len(menu_matches):
+        await query.edit_message_text(
+            "Match not found. Please go back and try again.",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🏠 Home", callback_data="menu_home")]
+            ]),
+        )
+        return
+
+    m = menu_matches[idx]
+    await query.edit_message_text("Analysing match...")
+
+    try:
+        from models.advanced_model import advanced_predict as model_predict
+        model = model_predict(m["player_a"], m["player_b"], m.get("surface", "hard"))
+        bet_player = (
+            m["player_a"] if model.get("prob_a", 0.5) >= model.get("prob_b", 0.5)
+            else m["player_b"]
+        )
+        api_stats = get_player_stats(bet_player)
+        card = format_match_card(m, model, api_stats)
+    except Exception as e:
+        logger.error(f"match_sel_callback error: {e}")
+        await query.edit_message_text(
+            "Failed to load analysis. Try again.",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🏠 Home", callback_data="menu_home")]
+            ]),
+        )
+        return
+
+    ctx.user_data["last_match_idx"] = idx
+    await query.edit_message_text(
+        card,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔍 Full Analysis — 1 credit", callback_data=f"full_ana_{idx}")],
+            [
+                InlineKeyboardButton(
+                    "⬅ Back",
+                    callback_data=f"tour_sel_{ctx.user_data.get('menu_tour', 'atp')}",
+                ),
+                InlineKeyboardButton("🏠 Home", callback_data="menu_home"),
+            ],
+        ]),
+    )
+
+
+async def full_ana_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    idx = int(query.data.split("_")[2])
+    menu_matches = ctx.user_data.get("menu_matches", [])
+
+    if not menu_matches or idx >= len(menu_matches):
+        await query.edit_message_text(
+            "Match not found. Go back and retry.",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🏠 Home", callback_data="menu_home")]
+            ]),
+        )
+        return
+
+    m = menu_matches[idx]
+    user = update.effective_user
+
+    try:
+        success = deduct_credit_atomic(user.id)
+    except Exception as e:
+        logger.error(f"Credit deduction error: {e}")
+        await query.edit_message_text(
+            "Could not process credits. Try again.",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🏠 Home", callback_data="menu_home")]
+            ]),
+        )
+        return
+
+    if not success:
+        await query.edit_message_text(
+            "Not enough credits.\nUse /buy to get more credits.",
+            reply_markup=InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("💳 Buy Credits", callback_data="menu_buycredits"),
+                    InlineKeyboardButton("🏠 Home", callback_data="menu_home"),
+                ]
+            ]),
+        )
+        return
+
+    await query.edit_message_text("Credit deducted. Loading full analysis...")
+
+    try:
+        from models.advanced_model import advanced_predict as model_predict
+        from signals.formatter import _escape
+
+        model = model_predict(m["player_a"], m["player_b"], m.get("surface", "hard"))
+        bet_player = (
+            m["player_a"] if model.get("prob_a", 0.5) >= model.get("prob_b", 0.5)
+            else m["player_b"]
+        )
+        api_stats = get_player_stats(bet_player)
+        h2h = get_h2h_stats(m["player_a"], m["player_b"])
+        form = get_current_tournament_form(bet_player)
+        ranking = get_player_ranking(bet_player)
+        card = format_match_card(m, model, api_stats)
+
+        lines = [card, "", "📋 *Full Analysis:*"]
+        lines += [
+            f"Elo (40%): {format_prob(model.get('elo_prob_a'))}",
+            f"Form (25%): {format_prob(model.get('form_prob_a'))}",
+            f"Surface (20%): {format_prob(model.get('surface_prob_a'))}",
+            f"H2H (15%): {format_prob(model.get('h2h_prob_a'))}",
+        ]
+
+        if h2h:
+            lines += [
+                "",
+                "🤝 *Head to Head:*",
+                f"Overall: {_escape(str(h2h.get('h2h_record', 'N/A')))}",
+                f"This surface: {_escape(str(h2h.get('surface_record', 'N/A')))}",
+                f"Last 5: {_escape(str(h2h.get('last_5_meetings', 'N/A')))}",
+            ]
+        if form:
+            lines += [
+                "",
+                "📅 *Tournament Form:*",
+                f"Wins this event: {form.get('wins_this_tournament', 'N/A')}",
+                f"Days since last match: {form.get('days_since_last_match', 'N/A')}",
+            ]
+        if ranking:
+            rank = ranking.get("current_rank", "N/A")
+            change = ranking.get("rank_change_this_week", 0)
+            sign = f"+{change}" if isinstance(change, int) and change > 0 else str(change)
+            lines += ["", f"🏅 Ranking: #{rank} ({sign} this week)"]
+
+        full_text = "\n".join(lines)
+        if len(full_text) > 4000:
+            full_text = full_text[:3950] + "\n\n...truncated"
+    except Exception as e:
+        logger.error(f"full_ana_callback error: {e}")
+        full_text = "Partial data only — some stats unavailable."
+
+    await query.edit_message_text(
+        full_text,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("🏠 Home", callback_data="menu_home")]
+        ]),
+    )
+
+
+async def vbets_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    idx = int(query.data.split("_")[1])
+    signals = ctx.user_data.get("vbets_signals", [])
+    top5 = sorted(
+        signals,
+        key=lambda x: x.get("true_edge_score", x.get("edge", 0)),
+        reverse=True,
+    )[:5]
+
+    if idx >= len(top5):
+        await query.edit_message_text(
+            "Signal not found. Try refreshing.",
+            reply_markup=InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("🔄 Refresh", callback_data="menu_vbets"),
+                    InlineKeyboardButton("🏠 Home", callback_data="menu_home"),
+                ]
+            ]),
+        )
+        return
+
+    s = top5[idx]
+    match = {
+        "player_a": s.get("player_a", ""),
+        "player_b": s.get("player_b", ""),
+        "surface": s.get("surface", "hard"),
+        "tournament": s.get("tournament", ""),
+        "odds_a": s.get("odds", 0),
+        "odds_b": s.get("odds", 0),
+    }
+    model = {
+        "prob_a": s.get("model_prob", 0.5),
+        "prob_b": 1 - s.get("model_prob", 0.5),
+        "true_edge_score": s.get("true_edge_score", s.get("edge", 0)),
+    }
+    api_stats = get_player_stats(s.get("bet_on", ""))
+    card = format_match_card(match, model, api_stats)
+    await query.edit_message_text(
+        card,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("⬅ Back", callback_data="menu_vbets"),
+                InlineKeyboardButton("🏠 Home", callback_data="menu_home"),
+            ]
+        ]),
+    )
+
+
+async def tgames_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    idx = int(query.data.split("_")[1])
+    tg_matches = ctx.user_data.get("tg_matches", [])
+
+    if idx >= len(tg_matches):
+        await query.edit_message_text(
+            "Match not found. Go back and retry.",
+            reply_markup=InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("⬅ Back", callback_data="menu_tgames"),
+                    InlineKeyboardButton("🏠 Home", callback_data="menu_home"),
+                ]
+            ]),
+        )
+        return
+
+    item = tg_matches[idx]
+    m = item["match"]
+    probs = item["probs"]
+    over_pct = round(probs["over"] * 100, 0)
+    under_pct = round(probs["under"] * 100, 0)
+
+    if probs["over"] > 0.55:
+        rec = "✅ Bet: Over 22.5 Games"
+    elif probs["under"] > 0.55:
+        rec = "✅ Bet: Under 22.5 Games"
+    else:
+        rec = "⚪ Skip: No clear edge"
+
+    from signals.formatter import _escape
+    text = (
+        f"📊 *{_escape(m['player_a'])} vs {_escape(m['player_b'])}*\n\n"
+        f"*Total Games Market:*\n"
+        f"Over 22.5 Games: {int(over_pct)}%\n"
+        f"Under 22.5 Games: {int(under_pct)}%\n\n"
+        f"{rec}"
+    )
+    await query.edit_message_text(
+        text,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("⬅ Back", callback_data="menu_tgames"),
+                InlineKeyboardButton("🏠 Home", callback_data="menu_home"),
+            ]
+        ]),
+    )
+
+
+async def kb_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    topic = query.data.split("_")[1]
+    back_btn = InlineKeyboardMarkup([[InlineKeyboardButton("⬅ Back to Help", callback_data="menu_kb")]])
+
+    if topic == "how":
+        await query.edit_message_text(
+            "🤖 *How Our AI Works*\n\n"
+            "Our model combines 4 factors:\n"
+            "• Elo Rating (40%) — surface-adjusted career form\n"
+            "• Recent Form (25%) — last 10 matches decay-weighted\n"
+            "• Surface Win Rate (20%) — last 2 years on this surface\n"
+            "• H2H Record (15%) — head-to-head history\n\n"
+            "Probabilities are calibrated using isotonic regression trained on historical ATP/WTA data.",
+            parse_mode="Markdown",
+            reply_markup=back_btn,
+        )
+    elif topic == "edge":
+        await query.edit_message_text(
+            "📈 *Understanding Edge & EV*\n\n"
+            "Edge = (Model Prob × Odds) - 1\n"
+            "Confidence = Model Prob / (1 - Model Prob)\n"
+            "True Edge Score = Edge × Confidence\n\n"
+            "Signals fire when thresholds are satisfied.\n"
+            "A +10% EV means every 100 units staked expects about +10 units long term.",
+            parse_mode="Markdown",
+            reply_markup=back_btn,
+        )
+    elif topic == "kelly":
+        await query.edit_message_text(
+            "💰 *Bankroll & Kelly Stake*\n\n"
+            "Quarter Kelly Formula:\n"
+            "Stake% = (((prob × odds - 1) / (odds - 1)) × 0.25)\n\n"
+            "This gives a bankroll fraction to risk while controlling variance.",
+            parse_mode="Markdown",
+            reply_markup=back_btn,
+        )
 
 
 # ── /portfolio (Paper Trading) ───────────────────────────────────────────────
@@ -912,6 +1488,7 @@ def main():
     app.add_handler(CommandHandler("portfolio",  portfolio))
     app.add_handler(CommandHandler("beta",       beta))
     app.add_handler(CommandHandler("help",       help_cmd))
+    app.add_handler(CommandHandler("menu",       menu_cmd))
     # Admin commands
     app.add_handler(CommandHandler("scan",       scan))
     app.add_handler(CommandHandler("addcredits", addcredits))
@@ -921,6 +1498,13 @@ def main():
     app.add_handler(CallbackQueryHandler(buy_callback, pattern="^buy_"))
     app.add_handler(CallbackQueryHandler(tournament_callback, pattern="^tourn_"))
     app.add_handler(CallbackQueryHandler(predict_callback, pattern="^pred_"))
+    app.add_handler(CallbackQueryHandler(menu_callback, pattern="^menu_"))
+    app.add_handler(CallbackQueryHandler(tour_sel_callback, pattern="^tour_sel_"))
+    app.add_handler(CallbackQueryHandler(match_sel_callback, pattern="^match_sel_"))
+    app.add_handler(CallbackQueryHandler(full_ana_callback, pattern="^full_ana_"))
+    app.add_handler(CallbackQueryHandler(vbets_callback, pattern="^vbets_"))
+    app.add_handler(CallbackQueryHandler(tgames_callback, pattern="^tgames_"))
+    app.add_handler(CallbackQueryHandler(kb_callback, pattern="^kb_"))
     # Global error handler
     app.add_error_handler(error_handler)
 

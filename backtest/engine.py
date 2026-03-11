@@ -26,6 +26,7 @@ from config import (
     MIN_VALUE_EDGE,
     MIN_MODEL_PROB,
 )
+from tennis_backtest.elo_filter import elo_agrees
 
 
 # ── Core edge calculation (mirrors edge_detector.py logic) ───────────────────
@@ -185,7 +186,9 @@ def backtest(atp_from=2023, atp_to=2024, wta_from=2023, wta_to=2024,
             ]:
                 if odds <= 1.0 or odds > 20.0:
                     continue
-                if elo_prob < min_elo_prob:
+                # Sprint-2 default: Elo must agree on direction and stay within 0.15 gap.
+                # Compatibility mode: min_elo_prob <= 0 disables the secondary Elo gate.
+                if min_elo_prob > 0 and not elo_agrees(model_prob, elo_prob, max_gap=0.15):
                     skipped += 1
                     continue
 
