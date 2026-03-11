@@ -410,11 +410,11 @@ def get_signal_accuracy() -> dict:
     try:
         cur = conn.execute("""
             SELECT
-                COUNT(*) AS total,
+                SUM(CASE WHEN r.is_correct IN (0, 1) THEN 1 ELSE 0 END) AS total,
                 SUM(CASE WHEN r.is_correct = 1 THEN 1 ELSE 0 END) AS wins,
                 SUM(CASE WHEN r.is_correct = 0 THEN 1 ELSE 0 END) AS losses,
-                SUM(CASE WHEN r.is_correct = 1 THEN s.odds - 1.0 ELSE -1.0 END) AS total_profit,
-                AVG(s.odds) AS avg_odds
+                SUM(CASE WHEN r.is_correct = 1 THEN s.odds - 1.0 WHEN r.is_correct = 0 THEN -1.0 ELSE 0 END) AS total_profit,
+                AVG(CASE WHEN r.is_correct IN (0, 1) THEN s.odds ELSE NULL END) AS avg_odds
             FROM signal_results r
             JOIN signals s ON r.signal_id = s.id
         """)
@@ -683,16 +683,24 @@ def update_signal_result(signal_id: int, result: str, actual_winner: str = None)
         )
         if actual_winner and result in ("win", "loss"):
             actual_winner = normalize_player_name(actual_winner)
+            is_correct_val = 1 if result == 'win' else 0
             conn.execute(
                 "INSERT INTO signal_results (signal_id, actual_winner, is_correct, recorded_at) "
                 "VALUES (%s, %s, %s, NOW()) "
                 "ON CONFLICT (signal_id) DO UPDATE "
                 "SET actual_winner = excluded.actual_winner, is_correct = excluded.is_correct, "
                 "recorded_at = NOW()",
-                (signal_id, actual_winner, 1 if result == 'win' else 0),
+                (signal_id, actual_winner, is_correct_val),
             )
         elif result == "push":
-            conn.execute("DELETE FROM signal_results WHERE signal_id=%s", (signal_id,))
+            conn.execute(
+                "INSERT INTO signal_results (signal_id, actual_winner, is_correct, recorded_at) "
+                "VALUES (%s, 'Push', -1, NOW()) "
+                "ON CONFLICT (signal_id) DO UPDATE "
+                "SET actual_winner = excluded.actual_winner, is_correct = -1, "
+                "recorded_at = NOW()",
+                (signal_id,),
+            )
         conn.commit()
     except Exception:
         conn.rollback()

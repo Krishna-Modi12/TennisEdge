@@ -277,6 +277,9 @@ def format_backtest_report(result: dict) -> str:
         return f"⚠️ {result['message']}"
 
     msg = (
+        f"⚠️ *WARNING: METHODOLOGICAL LEAK* ⚠️\n"
+        f"_This backtest uses present-day database snapshots rather than point-in-time logic._\n"
+        f"_Results suffer from look-ahead bias and are inherently optimistic._\n\n"
         f"📊 *BACKTEST RESULTS*\n"
         f"━━━━━━━━━━━━━━━━━━━\n\n"
         f"🎯 *Total Bets:* {result['total_bets']}\n"
