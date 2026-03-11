@@ -5,11 +5,11 @@ Run before every push to main / Render redeploy.
 ## 1 — Code Syntax Checks
 
 ```bash
-python -m py_compile fetch_odds.py
+python -m py_compile ingestion/fetch_odds.py
 python -m py_compile scheduler/job.py
 python -m py_compile database/db.py
 python -m py_compile bot.py
-python -m py_compile resolve_matches.py
+python -m py_compile ingestion/resolve_matches.py
 python -m py_compile signals/formatter.py
 python -m py_compile health.py
 python -m py_compile audit_deliveries.py
@@ -19,9 +19,9 @@ python -m py_compile monitor_live_quality.py
 ## 2 — Environment Variable Checks (Render dashboard)
 
 - [ ] TELEGRAM_BOT_TOKEN — set and correct
-- [ ] ALLSPORTS_API_KEY — set and active (check API quota remaining)
+- [ ] ODDS_API_KEY — set and active (check API quota remaining)
 - [ ] UPI_ID — set and matches payment details
-- [ ] DB_PATH — set correctly for Render persistent disk
+- [ ] DATABASE_URL — set correctly for Render persistent disk
 - [ ] MOCK_MODE — explicitly set to "false" (never blank, never "true")
 - [ ] ALLOW_MOCK_ON_RENDER — must NOT be set in production
 
@@ -51,11 +51,14 @@ python health.py
 ## 6 — After Deployment (on Render)
 
 - [ ] Run health.py again remotely (or check Render logs for startup errors)
-- [ ] Send /status command via bot — confirm response
-- [ ] Run resolve_matches.py dry-run:
+- [ ] Send /balance command via bot — confirm response
+- [ ] Verify Render Cron Job exists for daily Elo update:
+  - Schedule: `0 6 * * *` (UTC)
+  - Command: `python -m scheduler.update_elo_job`
+- [ ] Run resolve_matches dry-run:
 
   ```bash
-  python resolve_matches.py --dry-run
+  python -m ingestion.resolve_matches --dry-run
   ```
 
 - [ ] Run audit_deliveries.py once more

@@ -1,4 +1,5 @@
 # 🎾 TennisEdge
+[![CI](https://github.com/Krishna-Modi12/TennisEdge/actions/workflows/ci.yml/badge.svg)](https://github.com/Krishna-Modi12/TennisEdge/actions/workflows/ci.yml)
 
 A Telegram bot that detects value betting edges in tennis matches using surface-adjusted Elo ratings.
 
@@ -132,6 +133,14 @@ tennisedge/
 3. Add your real `TELEGRAM_BOT_TOKEN`
 4. Deploy to any VPS (DigitalOcean, Hetzner, etc.)
 5. Run with: `python bot.py`
+
+### Render Cron (Daily Elo Update)
+
+Add a Render Cron Job to keep Elo ratings updated from finished matches:
+
+- Schedule: `0 6 * * *` (06:00 UTC daily)
+- Command: `python -m scheduler.update_elo_job`
+- Optional dry-run check: `python -m scheduler.update_elo_job --dry-run`
 
 ---
 

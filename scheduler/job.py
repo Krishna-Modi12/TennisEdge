@@ -13,6 +13,9 @@ the live loop, guaranteeing we capture the correct running loop.
 """
 
 import asyncio
+import datetime as dt
+import os
+import threading
 from apscheduler.schedulers.background import BackgroundScheduler
 from ingestion.fetch_odds import fetch_odds
 from signals.edge_detector import detect_edges
@@ -20,6 +23,10 @@ from config import POLL_INTERVAL_MINUTES
 
 _bot_app  = None
 _bot_loop = None  # set via set_loop() from post_init, NOT before run_polling()
+_elo_update_lock = threading.Lock()
+_elo_update_inflight = False
+_last_elo_update_date = None
+ELO_DAILY_UPDATE_HOUR_UTC = int(os.getenv("ELO_DAILY_UPDATE_HOUR_UTC", "6"))
 
 
 def set_bot(app):
@@ -100,6 +107,44 @@ async def _send_signal_to_subscribers(signal: dict):
             print(f"[Scheduler] Failed to send to {telegram_id}: {e}")
 
 
+def _run_daily_elo_update_worker(target_date: dt.date):
+    """Background thread worker for daily Elo updates."""
+    global _elo_update_inflight, _last_elo_update_date
+    try:
+        from scheduler.update_elo_job import run_daily_elo_update
+        result = run_daily_elo_update(target_date=target_date, dry_run=False)
+        if result.get("ok"):
+            _last_elo_update_date = target_date
+    except Exception as e:
+        print(f"[Scheduler] Daily Elo update error: {e}")
+    finally:
+        with _elo_update_lock:
+            _elo_update_inflight = False
+
+
+def _trigger_daily_elo_update_if_due():
+    """
+    Start daily Elo update in a background thread once per UTC day.
+    It updates yesterday's matches and never blocks signal delivery.
+    """
+    global _elo_update_inflight
+    now = dt.datetime.utcnow()
+    if now.hour < ELO_DAILY_UPDATE_HOUR_UTC:
+        return
+    target_date = now.date() - dt.timedelta(days=1)
+    if _last_elo_update_date == target_date:
+        return
+    with _elo_update_lock:
+        if _elo_update_inflight:
+            return
+        _elo_update_inflight = True
+    threading.Thread(
+        target=_run_daily_elo_update_worker,
+        args=(target_date,),
+        daemon=True,
+    ).start()
+
+
 def run_pipeline():
     """
     Sync entry point — called by APScheduler in a background thread.
@@ -114,10 +159,24 @@ def run_pipeline():
         resolve_pending_signals()
     except Exception as e:
         print(f"[Scheduler] Paper trade resolution error: {e}")
+    # 1b. Daily Elo update (non-blocking secondary job)
+    try:
+        _trigger_daily_elo_update_if_due()
+    except Exception as e:
+        print(f"[Scheduler] Daily Elo trigger error: {e}")
 
     # 2. Fetch new matches and detect edges
-    matches = fetch_odds()
-    signals = detect_edges(matches)
+    try:
+        matches = fetch_odds()
+    except Exception as e:
+        print(f"[Scheduler] Odds fetch error: {e}")
+        return
+
+    try:
+        signals = detect_edges(matches)
+    except Exception as e:
+        print(f"[Scheduler] Edge detection error: {e}")
+        return
 
     if not signals:
         print("[Scheduler] No new signals this run.")

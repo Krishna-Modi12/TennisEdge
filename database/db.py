@@ -125,6 +125,17 @@ _SCHEMA_STATEMENTS = [
         updated_at     TIMESTAMP DEFAULT NOW(),
         UNIQUE(player_name, surface)
     )""",
+    """CREATE TABLE IF NOT EXISTS elo_history (
+        id             SERIAL PRIMARY KEY,
+        event_key      TEXT UNIQUE NOT NULL,
+        event_date     DATE NOT NULL,
+        winner         TEXT NOT NULL,
+        loser          TEXT NOT NULL,
+        surface        TEXT NOT NULL,
+        tournament     TEXT,
+        source         TEXT DEFAULT 'allsportsapi',
+        processed_at   TIMESTAMP DEFAULT NOW()
+    )""",
     """CREATE TABLE IF NOT EXISTS player_aliases (
         alias          TEXT PRIMARY KEY,
         canonical_name TEXT NOT NULL
@@ -187,7 +198,7 @@ def init_schema():
 
 
 def _migrate_signals_result_columns(conn):
-    """Add result + result_recorded_at columns if they don't exist."""
+    """Add result-related columns on signals if they don't exist."""
     cur = conn.execute(
         "SELECT column_name FROM information_schema.columns "
         "WHERE table_name = 'signals'"
@@ -199,6 +210,9 @@ def _migrate_signals_result_columns(conn):
     if "result_recorded_at" not in columns:
         conn.execute("ALTER TABLE signals ADD COLUMN result_recorded_at TIMESTAMP")
         logger.info("[DB] Migrated: added 'result_recorded_at' column to signals.")
+    if "closing_odds" not in columns:
+        conn.execute("ALTER TABLE signals ADD COLUMN closing_odds REAL")
+        logger.info("[DB] Migrated: added 'closing_odds' column to signals.")
     conn.commit()
 
 
@@ -559,6 +573,41 @@ def get_elo_player_count() -> int:
         raise
 
 
+def elo_history_event_exists(event_key: str) -> bool:
+    """Return True if an event_key has already been processed by daily Elo updater."""
+    conn = get_conn()
+    try:
+        cur = conn.execute("SELECT 1 FROM elo_history WHERE event_key = %s", (str(event_key),))
+        return cur.fetchone() is not None
+    except Exception:
+        conn.rollback()
+        raise
+
+
+def record_elo_history_event(
+    event_key: str,
+    event_date: str,
+    winner: str,
+    loser: str,
+    surface: str,
+    tournament: str = None,
+    source: str = "allsportsapi",
+):
+    """Insert a processed Elo-update event with dedupe on event_key."""
+    conn = get_conn()
+    try:
+        conn.execute(
+            "INSERT INTO elo_history (event_key, event_date, winner, loser, surface, tournament, source) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s) "
+            "ON CONFLICT (event_key) DO NOTHING",
+            (str(event_key), event_date, winner, loser, surface, tournament, source),
+        )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+
+
 # ── Player stats helpers (advanced model) ─────────────────────────────────────
 
 def get_player_stats(player: str, surface: str) -> dict:
@@ -675,14 +724,25 @@ def get_pending_signals(max_age_days: int = 7) -> list:
         raise
 
 
-def update_signal_result(signal_id: int, result: str, actual_winner: str = None):
-    """Set signal result to 'win' or 'loss' with timestamp."""
+def update_signal_result(
+    signal_id: int,
+    result: str,
+    actual_winner: str = None,
+    closing_odds: float = None,
+):
+    """Set signal result with timestamp and optional closing odds."""
     conn = get_conn()
     try:
-        conn.execute(
-            "UPDATE signals SET result=%s, result_recorded_at=NOW() WHERE id=%s",
-            (result, signal_id),
-        )
+        if closing_odds is None:
+            conn.execute(
+                "UPDATE signals SET result=%s, result_recorded_at=NOW() WHERE id=%s",
+                (result, signal_id),
+            )
+        else:
+            conn.execute(
+                "UPDATE signals SET result=%s, result_recorded_at=NOW(), closing_odds=%s WHERE id=%s",
+                (result, closing_odds, signal_id),
+            )
         if actual_winner and result in ("win", "loss"):
             actual_winner = normalize_player_name(actual_winner)
             is_correct_val = 1 if result == 'win' else 0
