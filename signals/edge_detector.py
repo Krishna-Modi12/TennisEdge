@@ -14,6 +14,7 @@ where Confidence = model_prob / (1 - model_prob)
 from config import MIN_VALUE_EDGE, MIN_MODEL_PROB, MIN_ODDS, MAX_ODDS
 from models.advanced_model import advanced_predict as model_predict
 from database.db import signal_exists, save_signal
+from integrations.tennis_api import search_player
 
 
 def odds_to_prob(odds: float) -> float:
@@ -57,24 +58,15 @@ def calculate_true_edge(model_prob: float, decimal_odds: float,
     }
 
 
+from signals.calculator import process_matches
+
 def detect_edges(matches: list) -> list:
     """
-    Run dual-validation edge detection on a list of matches with odds.
+    Run dual-validation edge detection using the new Multi-Factor Weighting logic.
     """
-    signals = []
-
-    for match in matches:
-        try:
-            signal = _process_match(match)
-            if signal:
-                signals.append(signal)
-        except Exception as e:
-            match_id = match.get("match_id", "unknown")
-            print(f"[EdgeDetector] Skipping match {match_id}: {e}")
-            continue
-
-    print(f"[EdgeDetector] Found {len(signals)} new edge(s).")
+    signals, _ = process_matches(matches)
     return signals
+
 
 
 def _process_match(match: dict) -> dict:

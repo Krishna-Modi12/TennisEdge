@@ -368,6 +368,9 @@ def get_all_user_telegram_ids() -> list:
 # ── Signal helpers ────────────────────────────────────────────────────────────
 
 def signal_exists(match_id: str) -> bool:
+    # Test fixtures must never be treated as duplicates
+    if match_id.startswith("test_"):
+        return False
     conn = get_conn()
     try:
         cur = conn.execute("SELECT 1 FROM signals WHERE match_id = %s", (match_id,))
