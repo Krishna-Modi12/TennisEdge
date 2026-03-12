@@ -2524,3 +2524,197 @@ requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='tennis-api-atp-wta-it
 2026-03-12 21:15:12,076 INFO api_non_200 path=/wta/player/ status=429
 2026-03-12 21:15:14,241 INFO api_non_200 path=/search status=429
 2026-03-12 21:15:17,090 INFO api_non_200 path=/search status=429
+2026-03-12 21:15:19,440 INFO api_non_200 path=/search status=429
+2026-03-12 21:15:21,742 INFO api_non_200 path=/atp/player/ status=429
+2026-03-12 21:15:24,330 INFO api_non_200 path=/wta/player/ status=429
+2026-03-12 21:15:26,527 INFO api_non_200 path=/search status=429
+2026-03-12 21:15:28,974 INFO api_non_200 path=/search status=429
+2026-03-12 21:15:31,218 INFO api_non_200 path=/search status=429
+2026-03-12 21:15:33,775 INFO api_non_200 path=/atp/player/ status=429
+2026-03-12 21:15:36,340 INFO api_non_200 path=/wta/player/ status=429
+2026-03-12 21:15:39,354 INFO api_non_200 path=/search status=429
+2026-03-12 21:15:42,338 INFO api_non_200 path=/search status=429
+2026-03-12 21:15:44,590 INFO api_non_200 path=/search status=429
+2026-03-12 21:15:47,383 INFO api_non_200 path=/atp/player/ status=429
+2026-03-12 21:15:49,745 INFO api_non_200 path=/wta/player/ status=429
+2026-03-12 21:15:51,945 INFO api_non_200 path=/search status=429
+2026-03-12 21:15:54,722 INFO api_non_200 path=/search status=429
+2026-03-12 21:15:56,905 INFO api_non_200 path=/search status=429
+2026-03-12 21:15:59,621 INFO api_non_200 path=/atp/player/ status=429
+2026-03-12 21:16:01,885 INFO api_non_200 path=/wta/player/ status=429
+2026-03-12 21:16:04,740 INFO api_non_200 path=/search status=429
+2026-03-12 21:16:07,142 INFO api_non_200 path=/search status=429
+2026-03-12 21:16:09,344 INFO api_non_200 path=/search status=429
+2026-03-12 21:16:11,634 INFO api_non_200 path=/atp/player/ status=429
+2026-03-12 21:16:14,036 INFO api_non_200 path=/wta/player/ status=429
+2026-03-12 21:16:16,281 INFO api_non_200 path=/search status=429
+2026-03-12 21:16:18,775 INFO api_non_200 path=/search status=429
+2026-03-12 21:16:20,956 INFO api_non_200 path=/search status=429
+2026-03-12 21:16:23,469 INFO api_non_200 path=/atp/player/ status=429
+2026-03-12 21:16:25,780 INFO api_non_200 path=/wta/player/ status=429
+2026-03-12 21:16:27,948 INFO api_non_200 path=/search status=429
+2026-03-12 21:16:30,704 INFO api_non_200 path=/search status=429
+2026-03-12 21:16:32,908 INFO api_non_200 path=/search status=429
+2026-03-12 21:16:35,375 INFO api_non_200 path=/atp/player/ status=429
+2026-03-12 21:16:37,964 INFO api_non_200 path=/wta/player/ status=429
+2026-03-12 21:16:40,230 INFO api_non_200 path=/search status=429
+2026-03-12 21:16:43,116 INFO api_non_200 path=/search status=429
+2026-03-12 21:16:45,394 INFO api_non_200 path=/search status=429
+2026-03-12 21:16:48,060 INFO api_non_200 path=/atp/player/ status=429
+2026-03-12 21:16:50,573 INFO api_non_200 path=/wta/player/ status=429
+2026-03-12 21:16:52,937 INFO api_non_200 path=/search status=429
+2026-03-12 21:16:55,652 INFO api_non_200 path=/search status=429
+2026-03-12 21:16:57,951 INFO api_non_200 path=/search status=429
+2026-03-12 21:17:00,522 INFO api_non_200 path=/atp/player/ status=429
+2026-03-12 21:17:03,144 INFO api_non_200 path=/wta/player/ status=429
+2026-03-12 21:17:05,484 INFO api_non_200 path=/search status=429
+2026-03-12 21:17:08,185 INFO api_non_200 path=/search status=429
+2026-03-12 21:17:10,428 INFO api_non_200 path=/search status=429
+2026-03-12 21:17:12,782 INFO api_non_200 path=/atp/player/ status=429
+2026-03-12 21:17:15,047 INFO api_non_200 path=/wta/player/ status=429
+2026-03-12 21:17:17,239 INFO api_non_200 path=/search status=429
+2026-03-12 21:17:19,757 INFO api_non_200 path=/search status=429
+2026-03-12 21:17:21,939 INFO api_non_200 path=/search status=429
+2026-03-12 21:17:24,181 INFO api_non_200 path=/atp/player/ status=429
+2026-03-12 21:17:26,563 INFO api_non_200 path=/wta/player/ status=429
+2026-03-12 21:17:28,805 INFO api_non_200 path=/search status=429
+2026-03-12 21:17:31,724 INFO api_non_200 path=/search status=429
+2026-03-12 21:17:34,027 INFO api_non_200 path=/search status=429
+2026-03-12 21:17:36,437 INFO api_non_200 path=/atp/player/ status=429
+2026-03-12 21:17:38,902 INFO api_non_200 path=/wta/player/ status=429
+2026-03-12 21:17:41,172 INFO api_non_200 path=/search status=429
+2026-03-12 21:17:43,767 INFO api_non_200 path=/search status=429
+2026-03-12 21:17:45,980 INFO api_non_200 path=/search status=429
+2026-03-12 21:17:48,447 INFO api_non_200 path=/atp/player/ status=429
+2026-03-12 21:17:51,008 INFO api_non_200 path=/wta/player/ status=429
+2026-03-12 21:17:53,295 INFO api_non_200 path=/search status=429
+2026-03-12 21:17:56,256 INFO api_non_200 path=/search status=429
+2026-03-12 21:17:58,503 INFO api_non_200 path=/search status=429
+2026-03-12 21:18:00,843 INFO api_non_200 path=/atp/player/ status=429
+2026-03-12 21:18:03,137 INFO api_non_200 path=/wta/player/ status=429
+2026-03-12 21:18:05,409 INFO api_non_200 path=/search status=429
+2026-03-12 21:18:08,173 INFO api_non_200 path=/search status=429
+2026-03-12 21:18:10,432 INFO api_non_200 path=/search status=429
+2026-03-12 21:18:12,975 INFO api_non_200 path=/atp/player/ status=429
+2026-03-12 21:18:15,498 INFO api_non_200 path=/wta/player/ status=429
+2026-03-12 21:18:17,765 INFO api_non_200 path=/search status=429
+2026-03-12 21:18:21,020 INFO api_non_200 path=/search status=429
+2026-03-12 21:18:23,356 INFO api_non_200 path=/search status=429
+2026-03-12 21:18:26,973 INFO api_non_200 path=/atp/player/ status=429
+2026-03-12 21:18:30,102 INFO api_non_200 path=/wta/player/ status=429
+2026-03-12 21:18:32,567 INFO api_non_200 path=/search status=429
+2026-03-12 21:18:35,660 INFO api_non_200 path=/search status=429
+2026-03-12 21:18:37,953 INFO api_non_200 path=/search status=429
+2026-03-12 21:18:40,723 INFO api_non_200 path=/atp/player/ status=429
+2026-03-12 21:18:43,257 INFO api_non_200 path=/wta/player/ status=429
+2026-03-12 21:19:04,660 ERROR api_request_failed path=/search: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
+Traceback (most recent call last):
+  File "C:\Users\krish\AppData\Local\Programs\Python\Python310\lib\site-packages\urllib3\connectionpool.py", line 787, in urlopen
+    response = self._make_request(
+  File "C:\Users\krish\AppData\Local\Programs\Python\Python310\lib\site-packages\urllib3\connectionpool.py", line 534, in _make_request
+    response = conn.getresponse()
+  File "C:\Users\krish\AppData\Local\Programs\Python\Python310\lib\site-packages\urllib3\connection.py", line 571, in getresponse
+    httplib_response = super().getresponse()
+  File "C:\Users\krish\AppData\Local\Programs\Python\Python310\lib\http\client.py", line 1375, in getresponse
+    response.begin()
+  File "C:\Users\krish\AppData\Local\Programs\Python\Python310\lib\http\client.py", line 318, in begin
+    version, status, reason = self._read_status()
+  File "C:\Users\krish\AppData\Local\Programs\Python\Python310\lib\http\client.py", line 287, in _read_status
+    raise RemoteDisconnected("Remote end closed connection without"
+http.client.RemoteDisconnected: Remote end closed connection without response
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\krish\AppData\Local\Programs\Python\Python310\lib\site-packages\requests\adapters.py", line 486, in send
+    resp = conn.urlopen(
+  File "C:\Users\krish\AppData\Local\Programs\Python\Python310\lib\site-packages\urllib3\connectionpool.py", line 841, in urlopen
+    retries = retries.increment(
+  File "C:\Users\krish\AppData\Local\Programs\Python\Python310\lib\site-packages\urllib3\util\retry.py", line 490, in increment
+    raise reraise(type(error), error, _stacktrace)
+  File "C:\Users\krish\AppData\Local\Programs\Python\Python310\lib\site-packages\urllib3\util\util.py", line 38, in reraise
+    raise value.with_traceback(tb)
+  File "C:\Users\krish\AppData\Local\Programs\Python\Python310\lib\site-packages\urllib3\connectionpool.py", line 787, in urlopen
+    response = self._make_request(
+  File "C:\Users\krish\AppData\Local\Programs\Python\Python310\lib\site-packages\urllib3\connectionpool.py", line 534, in _make_request
+    response = conn.getresponse()
+  File "C:\Users\krish\AppData\Local\Programs\Python\Python310\lib\site-packages\urllib3\connection.py", line 571, in getresponse
+    httplib_response = super().getresponse()
+  File "C:\Users\krish\AppData\Local\Programs\Python\Python310\lib\http\client.py", line 1375, in getresponse
+    response.begin()
+  File "C:\Users\krish\AppData\Local\Programs\Python\Python310\lib\http\client.py", line 318, in begin
+    version, status, reason = self._read_status()
+  File "C:\Users\krish\AppData\Local\Programs\Python\Python310\lib\http\client.py", line 287, in _read_status
+    raise RemoteDisconnected("Remote end closed connection without"
+urllib3.exceptions.ProtocolError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\krish\OneDrive\Desktop\BOT\TennisEdge-New\integrations\tennis_api.py", line 142, in _request_json
+    resp = _SESSION.get(url, headers=headers, params=params, timeout=REQ_TIMEOUT)
+  File "C:\Users\krish\AppData\Local\Programs\Python\Python310\lib\site-packages\requests\sessions.py", line 602, in get
+    return self.request("GET", url, **kwargs)
+  File "C:\Users\krish\AppData\Local\Programs\Python\Python310\lib\site-packages\requests\sessions.py", line 589, in request
+    resp = self.send(prep, **send_kwargs)
+  File "C:\Users\krish\AppData\Local\Programs\Python\Python310\lib\site-packages\requests\sessions.py", line 703, in send
+    r = adapter.send(request, **kwargs)
+  File "C:\Users\krish\AppData\Local\Programs\Python\Python310\lib\site-packages\requests\adapters.py", line 501, in send
+    raise ConnectionError(err, request=request)
+requests.exceptions.ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
+2026-03-12 21:19:07,776 INFO api_non_200 path=/search status=429
+2026-03-12 21:19:10,160 INFO api_non_200 path=/search status=429
+2026-03-12 21:19:12,425 INFO api_non_200 path=/atp/player/ status=429
+2026-03-12 21:19:14,704 INFO api_non_200 path=/wta/player/ status=429
+2026-03-12 21:19:16,959 INFO api_non_200 path=/search status=429
+2026-03-12 21:19:19,899 INFO api_non_200 path=/search status=429
+2026-03-12 21:19:22,086 INFO api_non_200 path=/search status=429
+2026-03-12 21:19:24,702 INFO api_non_200 path=/atp/player/ status=429
+2026-03-12 21:19:27,158 INFO api_non_200 path=/wta/player/ status=429
+2026-03-12 21:19:29,340 INFO api_non_200 path=/search status=429
+2026-03-12 21:19:31,851 INFO api_non_200 path=/search status=429
+2026-03-12 21:19:34,065 INFO api_non_200 path=/search status=429
+2026-03-12 21:19:36,416 INFO api_non_200 path=/atp/player/ status=429
+2026-03-12 21:19:39,467 INFO api_non_200 path=/wta/player/ status=429
+2026-03-12 21:19:41,642 INFO api_non_200 path=/search status=429
+2026-03-12 21:19:44,110 INFO api_non_200 path=/search status=429
+2026-03-12 21:19:46,314 INFO api_non_200 path=/search status=429
+2026-03-12 21:19:48,886 INFO api_non_200 path=/atp/player/ status=429
+2026-03-12 21:19:51,169 INFO api_non_200 path=/wta/player/ status=429
+2026-03-12 21:19:53,350 INFO api_non_200 path=/search status=429
+2026-03-12 21:19:55,876 INFO api_non_200 path=/search status=429
+2026-03-12 21:19:58,610 INFO api_non_200 path=/search status=429
+2026-03-12 21:20:00,889 INFO api_non_200 path=/atp/player/ status=429
+2026-03-12 21:20:03,249 INFO api_non_200 path=/wta/player/ status=429
+2026-03-12 21:20:05,874 INFO api_non_200 path=/search status=429
+2026-03-12 21:20:08,388 INFO api_non_200 path=/search status=429
+2026-03-12 21:20:10,582 INFO api_non_200 path=/search status=429
+2026-03-12 21:20:12,856 INFO api_non_200 path=/atp/player/ status=429
+2026-03-12 21:20:15,162 INFO api_non_200 path=/wta/player/ status=429
+2026-03-12 21:20:17,331 INFO api_non_200 path=/search status=429
+2026-03-12 21:20:20,359 INFO api_non_200 path=/search status=429
+2026-03-12 21:20:22,529 INFO api_non_200 path=/search status=429
+2026-03-12 21:20:24,823 INFO api_non_200 path=/atp/player/ status=429
+2026-03-12 21:20:27,697 INFO api_non_200 path=/wta/player/ status=429
+2026-03-12 21:20:29,891 INFO api_non_200 path=/search status=429
+2026-03-12 21:20:33,015 INFO api_non_200 path=/search status=429
+2026-03-12 21:20:35,301 INFO api_non_200 path=/search status=429
+2026-03-12 21:20:37,676 INFO api_non_200 path=/atp/player/ status=429
+2026-03-12 21:20:39,975 INFO api_non_200 path=/wta/player/ status=429
+2026-03-12 21:20:42,150 INFO api_non_200 path=/search status=429
+2026-03-12 21:20:45,230 INFO api_non_200 path=/search status=429
+2026-03-12 21:20:47,556 INFO api_non_200 path=/search status=429
+2026-03-12 21:20:49,893 INFO api_non_200 path=/atp/player/ status=429
+2026-03-12 21:20:52,137 INFO api_non_200 path=/wta/player/ status=429
+2026-03-12 21:20:54,329 INFO api_non_200 path=/search status=429
+2026-03-12 21:20:56,725 INFO api_non_200 path=/search status=429
+2026-03-12 21:20:58,887 INFO api_non_200 path=/search status=429
+2026-03-12 21:21:01,206 INFO api_non_200 path=/atp/player/ status=429
+2026-03-12 21:21:03,822 INFO api_non_200 path=/wta/player/ status=429
+2026-03-12 21:21:05,983 INFO api_non_200 path=/search status=429
+2026-03-12 21:21:08,836 INFO api_non_200 path=/search status=429
+2026-03-12 21:21:11,005 INFO api_non_200 path=/search status=429
+2026-03-12 21:21:13,315 INFO api_non_200 path=/atp/player/ status=429
+2026-03-12 21:21:17,806 INFO api_non_200 path=/wta/player/ status=429
+2026-03-12 21:21:20,092 INFO api_non_200 path=/search status=429
+2026-03-12 21:21:22,917 INFO api_non_200 path=/search status=429
