@@ -224,6 +224,17 @@ class TestCalibrationAndRisk(unittest.TestCase):
         self.assertGreaterEqual(f, 0.0)
         self.assertLessEqual(f, 0.05)
 
+    def test_dynamic_edge_threshold_clamps_out_of_range_base(self):
+        with patch("signals.calculator.get_model_parameter", return_value=0.50):
+            self.assertEqual(compute_dynamic_edge_threshold(0.02), 0.06)
+            self.assertEqual(compute_dynamic_edge_threshold(0.12), 0.08)
+
+    def test_half_kelly_clamps_out_of_range_multiplier(self):
+        with patch("signals.calculator.get_model_parameter", return_value=10.0):
+            f = compute_kelly_fraction(0.65, 2.2)
+        self.assertGreaterEqual(f, 0.0)
+        self.assertLessEqual(f, 0.05)
+
 
 class TestOddsSanityBounds(unittest.TestCase):
     """Improvement 2 — Odds sanity bounds."""

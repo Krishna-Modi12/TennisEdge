@@ -12,41 +12,45 @@ Run from: project root
 import json
 import os
 import sys
-import sqlite3
-from datetime import datetime
+import psycopg2
+from datetime import datetime, timezone
+from config import DATABASE_URL
 
 # DB_PATH has a safe default — no env var required for basic operation
-DB_PATH = os.getenv("DB_PATH", "database/signals.db")
+# DATABASE_URL is imported from config
 
 
 def check_database() -> dict:
     """Verify database is accessible and has recent activity."""
     conn = None
     try:
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
+        conn = psycopg2.connect(DATABASE_URL)
+        cur = conn.cursor()
 
         # Check signal_deliveries table exists
-        cursor.execute("""
-            SELECT name FROM sqlite_master
-            WHERE type='table' AND name='signal_deliveries'
+        cur.execute("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_name = 'signal_deliveries'
+            )
         """)
-        table_exists = cursor.fetchone() is not None
+        table_exists = cur.fetchone()[0]
 
         # Last signal sent
         last_signal = None
         hours_since_last = None
         if table_exists:
-            cursor.execute("SELECT MAX(created_at) FROM signal_deliveries")
-            row = cursor.fetchone()
+            cur.execute("SELECT MAX(delivered_at) FROM signal_deliveries")
+            row = cur.fetchone()
             if row and row[0]:
-                last_signal = row[0]
-                try:
-                    last_dt = datetime.fromisoformat(last_signal)
-                    delta_secs = (datetime.utcnow() - last_dt).total_seconds()
-                    hours_since_last = round(delta_secs / 3600, 1)
-                except Exception:
-                    pass
+                raw_last = row[0]
+                # Ensure it's timezone-aware for comparison
+                if raw_last.tzinfo is None:
+                    raw_last = raw_last.replace(tzinfo=timezone.utc)
+                
+                delta_secs = (datetime.now(timezone.utc) - raw_last).total_seconds()
+                hours_since_last = round(delta_secs / 3600, 1)
+                last_signal = raw_last.isoformat()
 
         return {
             "status":           "ok",
@@ -84,8 +88,7 @@ def check_env_vars() -> dict:
     # DB_PATH is excluded — it has a safe default in this file
     required = [
         "TELEGRAM_BOT_TOKEN",
-        "ALLSPORTS_API_KEY",
-        "UPI_ID",
+        "ODDS_API_KEY",
     ]
     missing = [v for v in required if not os.getenv(v)]
     return {

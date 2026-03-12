@@ -1,7 +1,12 @@
 import unittest
 from unittest.mock import patch
 
-from monitoring.model_monitor import apply_adaptive_tuning, calculate_recent_model_performance
+from monitoring.model_monitor import (
+    apply_adaptive_tuning,
+    calculate_recent_model_performance,
+    enforce_parameter_safety_bounds,
+    get_parameter_safety_report,
+)
 
 
 class ModelMonitorTests(unittest.TestCase):
@@ -27,6 +32,37 @@ class ModelMonitorTests(unittest.TestCase):
             result = apply_adaptive_tuning(window=100)
         self.assertTrue(result["changed"])
         self.assertGreaterEqual(set_mock.call_count, 2)
+
+    def test_enforce_parameter_safety_bounds_clamps_out_of_range_values(self):
+        values = {
+            "dynamic_edge_base": 0.2,
+            "kelly_multiplier": 5.0,
+        }
+
+        with patch(
+            "monitoring.model_monitor.get_model_parameter",
+            side_effect=lambda name, default: values.get(name, default),
+        ), patch("monitoring.model_monitor.set_model_parameter") as set_mock:
+            report = enforce_parameter_safety_bounds()
+
+        self.assertTrue(report["changed"])
+        self.assertAlmostEqual(report["edge_threshold_base"], 0.06, places=6)
+        self.assertAlmostEqual(report["kelly_multiplier"], 1.25, places=6)
+        self.assertGreaterEqual(set_mock.call_count, 2)
+
+    def test_get_parameter_safety_report_flags_out_of_bounds(self):
+        values = {
+            "dynamic_edge_base": 0.01,
+            "kelly_multiplier": 2.0,
+        }
+        with patch(
+            "monitoring.model_monitor.get_model_parameter",
+            side_effect=lambda name, default: values.get(name, default),
+        ):
+            report = get_parameter_safety_report()
+        self.assertFalse(report["edge_in_bounds"])
+        self.assertFalse(report["kelly_in_bounds"])
+        self.assertFalse(report["safe"])
 
 
 if __name__ == "__main__":

@@ -108,6 +108,7 @@ _SCHEMA_STATEMENTS = [
         strength_component_prob REAL,
         mc_component_prob REAL,
         market_component_prob REAL,
+        ml_component_prob REAL,
         ensemble_prob REAL,
         edge         REAL,
         odds         REAL,
@@ -248,16 +249,36 @@ _SCHEMA_STATEMENTS = [
         summary        JSONB,
         created_at     TIMESTAMP DEFAULT NOW()
     )""",
+    """CREATE TABLE IF NOT EXISTS model_optimization_results (
+        id             SERIAL PRIMARY KEY,
+        run_name       TEXT,
+        params_json    JSONB NOT NULL,
+        score          NUMERIC NOT NULL,
+        roi_pct        NUMERIC,
+        win_rate_pct   NUMERIC,
+        clv_avg        NUMERIC,
+        notes          TEXT,
+        created_at     TIMESTAMP DEFAULT NOW()
+    )""",
     """CREATE TABLE IF NOT EXISTS unmatched_players (
         id         SERIAL PRIMARY KEY,
         name       TEXT UNIQUE NOT NULL,
         first_seen TIMESTAMP DEFAULT NOW()
+    )""",
+    """CREATE TABLE IF NOT EXISTS odds_history (
+        id           SERIAL PRIMARY KEY,
+        match_id     TEXT NOT NULL,
+        odds_a       NUMERIC,
+        odds_b       NUMERIC,
+        timestamp    TIMESTAMP DEFAULT NOW()
     )""",
     "CREATE INDEX IF NOT EXISTS idx_sent_signals_match ON sent_signals(match_id)",
     "CREATE INDEX IF NOT EXISTS idx_signal_perf_match ON signal_performance(match_id)",
     "CREATE INDEX IF NOT EXISTS idx_api_cache_expiry ON api_cache(expires_at)",
     "CREATE INDEX IF NOT EXISTS idx_player_surface_stats_lookup ON player_surface_stats(player_name, surface)",
     "CREATE INDEX IF NOT EXISTS idx_backtest_results_created_at ON backtest_results(created_at)",
+    "CREATE INDEX IF NOT EXISTS idx_model_optimization_results_score ON model_optimization_results(score DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_odds_history_match ON odds_history(match_id, timestamp DESC)",
 ]
 
 
@@ -316,6 +337,9 @@ def _migrate_signals_result_columns(conn):
         if "market_component_prob" not in columns:
             cur.execute("ALTER TABLE signals ADD COLUMN market_component_prob REAL")
             logger.info("[DB] Migrated: added 'market_component_prob' column to signals.")
+        if "ml_component_prob" not in columns:
+            cur.execute("ALTER TABLE signals ADD COLUMN ml_component_prob REAL")
+            logger.info("[DB] Migrated: added 'ml_component_prob' column to signals.")
         if "ensemble_prob" not in columns:
             cur.execute("ALTER TABLE signals ADD COLUMN ensemble_prob REAL")
             logger.info("[DB] Migrated: added 'ensemble_prob' column to signals.")
@@ -610,6 +634,7 @@ def save_signal(
     strength_component_prob=None,
     mc_component_prob=None,
     market_component_prob=None,
+    ml_component_prob=None,
     ensemble_prob=None,
     volatility=None,
     edge_threshold=None,
@@ -621,14 +646,14 @@ def save_signal(
         cur = conn.execute(
             "INSERT INTO signals (match_id,tournament,surface,player_a,player_b,"
             "bet_on,model_prob,market_prob,calibrated_prob,raw_model_prob,"
-            "elo_component_prob,strength_component_prob,mc_component_prob,market_component_prob,ensemble_prob,"
+            "elo_component_prob,strength_component_prob,mc_component_prob,market_component_prob,ml_component_prob,ensemble_prob,"
             "edge,odds,"
             "volatility,edge_threshold,kelly_fraction,recommended_bet_size) "
-            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id",
+            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id",
             (match_id, tournament, surface, player_a, player_b,
              bet_on, model_prob, market_prob, calibrated_prob, raw_model_prob,
              elo_component_prob, strength_component_prob, mc_component_prob,
-             market_component_prob, ensemble_prob,
+             market_component_prob, ml_component_prob, ensemble_prob,
              edge, odds, volatility, edge_threshold, kelly_fraction, recommended_bet_size),
         )
         sid = cur.fetchone()[0]
@@ -829,6 +854,81 @@ def get_recent_signal_performance(limit: int = 100) -> list:
     except Exception:
         conn.rollback()
         raise
+def save_odds_snapshot(match_id: str, odds_a: float, odds_b: float):
+    """Save a point-in-time snapshot of the odds for a match."""
+    conn = get_conn()
+    try:
+        conn.execute(
+            "INSERT INTO odds_history (match_id, odds_a, odds_b) VALUES (%s, %s, %s)",
+            (match_id, odds_a, odds_b)
+        )
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        logger.warning(f"[DB] Failed to save odds snapshot for {match_id}: {e}")
+
+def get_odds_history(match_id: str, limit: int = 24) -> list[dict]:
+    """Retrieve the recent odds history for a match."""
+    conn = get_conn()
+    cur = conn.execute(
+        "SELECT odds_a, odds_b, timestamp FROM odds_history WHERE match_id = %s ORDER BY timestamp DESC LIMIT %s",
+        (match_id, limit)
+    )
+    rows = cur.fetchall()
+    return [{"odds_a": float(r[0]), "odds_b": float(r[1]), "timestamp": r[2]} for r in rows]
+
+
+
+def get_ml_training_signals(limit: int = 5000) -> list:
+    """
+    Fetch resolved historical signal rows for ML training.
+    Label uses signals.result: win=1, loss=0.
+    """
+    conn = get_conn()
+    try:
+        cur = conn.execute(
+            "SELECT match_id, surface, model_prob, market_prob, calibrated_prob, raw_model_prob, "
+            "edge, odds, volatility, edge_threshold, kelly_fraction, "
+            "elo_component_prob, strength_component_prob, mc_component_prob, market_component_prob, ensemble_prob, "
+            "result, created_at "
+            "FROM signals "
+            "WHERE result IN ('win', 'loss') "
+            "AND model_prob IS NOT NULL "
+            "AND market_prob IS NOT NULL "
+            "AND odds IS NOT NULL "
+            "ORDER BY created_at DESC "
+            "LIMIT %s",
+            (int(limit),),
+        )
+        rows = cur.fetchall()
+        out = []
+        for r in rows:
+            out.append(
+                {
+                    "match_id": r[0],
+                    "surface": r[1],
+                    "model_prob": float(r[2]) if r[2] is not None else None,
+                    "market_prob": float(r[3]) if r[3] is not None else None,
+                    "calibrated_prob": float(r[4]) if r[4] is not None else None,
+                    "raw_model_prob": float(r[5]) if r[5] is not None else None,
+                    "edge": float(r[6]) if r[6] is not None else None,
+                    "odds": float(r[7]) if r[7] is not None else None,
+                    "volatility": float(r[8]) if r[8] is not None else None,
+                    "edge_threshold": float(r[9]) if r[9] is not None else None,
+                    "kelly_fraction": float(r[10]) if r[10] is not None else None,
+                    "elo_component_prob": float(r[11]) if r[11] is not None else None,
+                    "strength_component_prob": float(r[12]) if r[12] is not None else None,
+                    "mc_component_prob": float(r[13]) if r[13] is not None else None,
+                    "market_component_prob": float(r[14]) if r[14] is not None else None,
+                    "ensemble_prob": float(r[15]) if r[15] is not None else None,
+                    "label": 1 if r[16] == "win" else 0,
+                    "created_at": r[17],
+                }
+            )
+        return out
+    except Exception:
+        conn.rollback()
+        raise
 
 
 def get_model_parameter(name: str, default=None):
@@ -963,6 +1063,120 @@ def get_recent_backtest_results(limit: int = 20) -> list:
                 "bankroll_start": float(r[5]) if r[5] is not None else None,
                 "bankroll_end": float(r[6]) if r[6] is not None else None,
                 "summary": r[7],
+                "created_at": r[8],
+            }
+            for r in rows
+        ]
+    except Exception:
+        conn.rollback()
+        raise
+
+
+def save_model_optimization_result(
+    run_name: str,
+    params: dict,
+    score: float,
+    roi_pct: float = None,
+    win_rate_pct: float = None,
+    clv_avg: float = None,
+    notes: str = None,
+) -> int:
+    """Persist one hyperparameter-search trial result."""
+    conn = get_conn()
+    try:
+        cur = conn.execute(
+            "INSERT INTO model_optimization_results "
+            "(run_name, params_json, score, roi_pct, win_rate_pct, clv_avg, notes) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id",
+            (
+                run_name,
+                psycopg2.extras.Json(params or {}),
+                float(score),
+                roi_pct,
+                win_rate_pct,
+                clv_avg,
+                notes,
+            ),
+        )
+        row_id = cur.fetchone()[0]
+        conn.commit()
+        return row_id
+    except Exception:
+        conn.rollback()
+        raise
+
+
+def get_best_model_optimization_result(run_name: str = None) -> dict:
+    """Return highest-score optimization result, optionally filtered by run_name."""
+    conn = get_conn()
+    try:
+        if run_name:
+            cur = conn.execute(
+                "SELECT id, run_name, params_json, score, roi_pct, win_rate_pct, clv_avg, notes, created_at "
+                "FROM model_optimization_results "
+                "WHERE run_name = %s "
+                "ORDER BY score DESC, created_at DESC "
+                "LIMIT 1",
+                (run_name,),
+            )
+        else:
+            cur = conn.execute(
+                "SELECT id, run_name, params_json, score, roi_pct, win_rate_pct, clv_avg, notes, created_at "
+                "FROM model_optimization_results "
+                "ORDER BY score DESC, created_at DESC "
+                "LIMIT 1"
+            )
+        row = cur.fetchone()
+        if not row:
+            return None
+        return {
+            "id": row[0],
+            "run_name": row[1],
+            "params": row[2] or {},
+            "score": float(row[3]) if row[3] is not None else None,
+            "roi_pct": float(row[4]) if row[4] is not None else None,
+            "win_rate_pct": float(row[5]) if row[5] is not None else None,
+            "clv_avg": float(row[6]) if row[6] is not None else None,
+            "notes": row[7],
+            "created_at": row[8],
+        }
+    except Exception:
+        conn.rollback()
+        raise
+
+
+def get_recent_model_optimization_results(limit: int = 50, run_name: str = None) -> list:
+    """Return recent optimization trials."""
+    conn = get_conn()
+    try:
+        if run_name:
+            cur = conn.execute(
+                "SELECT id, run_name, params_json, score, roi_pct, win_rate_pct, clv_avg, notes, created_at "
+                "FROM model_optimization_results "
+                "WHERE run_name = %s "
+                "ORDER BY created_at DESC, id DESC "
+                "LIMIT %s",
+                (run_name, int(limit)),
+            )
+        else:
+            cur = conn.execute(
+                "SELECT id, run_name, params_json, score, roi_pct, win_rate_pct, clv_avg, notes, created_at "
+                "FROM model_optimization_results "
+                "ORDER BY created_at DESC, id DESC "
+                "LIMIT %s",
+                (int(limit),),
+            )
+        rows = cur.fetchall()
+        return [
+            {
+                "id": r[0],
+                "run_name": r[1],
+                "params": r[2] or {},
+                "score": float(r[3]) if r[3] is not None else None,
+                "roi_pct": float(r[4]) if r[4] is not None else None,
+                "win_rate_pct": float(r[5]) if r[5] is not None else None,
+                "clv_avg": float(r[6]) if r[6] is not None else None,
+                "notes": r[7],
                 "created_at": r[8],
             }
             for r in rows

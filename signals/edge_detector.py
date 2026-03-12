@@ -11,10 +11,7 @@ True Edge Score = Value Edge × Confidence
 where Confidence = model_prob / (1 - model_prob)
 """
 
-from config import MIN_VALUE_EDGE, MIN_MODEL_PROB, MIN_ODDS, MAX_ODDS
-from models.advanced_model import advanced_predict as model_predict
-from database.db import signal_exists, save_signal
-from integrations.tennis_api import search_player
+from config import MIN_VALUE_EDGE, MIN_MODEL_PROB
 
 
 def odds_to_prob(odds: float) -> float:
@@ -66,97 +63,3 @@ def detect_edges(matches: list) -> list:
     """
     signals, _ = process_matches(matches)
     return sorted(signals, key=lambda s: s.get("ev_score", float("-inf")), reverse=True)
-
-
-
-def _process_match(match: dict) -> dict:
-    """Process a single match with Advanced Blended Model. Returns signal dict or None."""
-    match_id   = match["match_id"]
-    player_a   = match["player_a"]
-    player_b   = match["player_b"]
-    surface    = match.get("surface", "hard")
-    tournament = match.get("tournament", "Unknown")
-    
-    odds_a     = float(match["odds_a"] or 0)
-    odds_b     = float(match["odds_b"] or 0)
-
-    if signal_exists(match_id):
-        return None
-
-    # Get model prediction (Blended: Elo, Form, H2H, Surface)
-    model = model_predict(player_a, player_b, surface)
-    prob_a, prob_b = model["prob_a"], model["prob_b"]
-
-    a_in_range = MIN_ODDS <= odds_a <= MAX_ODDS
-    b_in_range = MIN_ODDS <= odds_b <= MAX_ODDS
-    if not a_in_range and not b_in_range:
-        return None
-
-    best_signal = None
-
-    if a_in_range and odds_a > 0:
-        te_a = calculate_true_edge(prob_a, odds_a)
-        if te_a["signal_valid"]:
-            best_signal = {
-                "player": player_a, "odds": odds_a, "model_prob": prob_a,
-                "market_prob": te_a["implied_prob"],
-                **te_a,
-                "elo_prob": model.get("elo_prob_a"),
-            }
-
-    if b_in_range and odds_b > 0:
-        te_b = calculate_true_edge(prob_b, odds_b)
-        if te_b["signal_valid"]:
-            if best_signal is None or te_b["true_edge_score"] > best_signal["true_edge_score"]:
-                best_signal = {
-                    "player": player_b, "odds": odds_b, "model_prob": prob_b,
-                    "market_prob": te_b["implied_prob"],
-                    **te_b,
-                    "elo_prob": 1.0 - model.get("elo_prob_a"),
-                }
-
-    if best_signal is None:
-        return None
-
-    signal_id = save_signal(
-        match_id=match_id,
-        tournament=tournament,
-        surface=surface,
-        player_a=player_a,
-        player_b=player_b,
-        bet_on=best_signal["player"],
-        model_prob=best_signal["model_prob"],
-        market_prob=best_signal["market_prob"],
-        edge=best_signal["true_edge_score"],  # store true edge score as the edge
-        odds=best_signal["odds"],
-    )
-
-    # Prepare factors for breakdown (correctly flipped for the chosen winner)
-    is_a = (best_signal["player"] == player_a)
-    factors = {
-        "elo_prob":     model.get("elo_prob_a") if is_a else (1.0 - model.get("elo_prob_a", 0.5)),
-        "form_prob":    model.get("form_prob_a") if is_a else (1.0 - model.get("form_prob_a", 0.5)),
-        "surface_prob": model.get("surface_prob_a") if is_a else (1.0 - model.get("surface_prob_a", 0.5)),
-        "h2h_prob":     model.get("h2h_prob_a") if is_a else (1.0 - model.get("h2h_prob_a", 0.5)),
-        "h2h_wins_a":   model.get("h2h_wins_a", 0) if is_a else model.get("h2h_wins_b", 0),
-        "h2h_wins_b":   model.get("h2h_wins_b", 0) if is_a else model.get("h2h_wins_a", 0),
-    }
-
-    return {
-        "signal_id":        signal_id,
-        "match_id":         match_id,
-        "tournament":       tournament,
-        "surface":          surface,
-        "player_a":         player_a,
-        "player_b":         player_b,
-        "bet_on":           best_signal["player"],
-        "model_prob":       best_signal["model_prob"],
-        "market_prob":      best_signal["market_prob"],
-        "odds":             best_signal["odds"],
-        "value_edge":       best_signal["value_edge"],
-        "confidence":       best_signal["confidence"],
-        "true_edge_score":  best_signal["true_edge_score"],
-        "edge":             best_signal["true_edge_score"],
-        "data_quality":     model.get("data_quality", "partial"),
-        **factors
-    }

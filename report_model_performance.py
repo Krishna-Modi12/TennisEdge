@@ -4,6 +4,7 @@ CLI script to report model ROI and CLV metrics.
 """
 
 from database.db import get_conn
+from monitoring.model_monitor import get_parameter_safety_report
 
 def report():
     conn = get_conn()
@@ -38,6 +39,13 @@ def report():
     print(f"Total Profit:{profit:+.2f} units")
     print(f"ROI:         {roi:+.1f}%")
     print(f"Average CLV: {avg_clv:.3f}" if avg_clv else "Average CLV: N/A")
+    print("")
+    safety = get_parameter_safety_report()
+    print("ADAPTIVE PARAMETER SAFETY")
+    print("-------------------------")
+    print(f"dynamic_edge_base: {safety['edge_threshold_base']:.4f} (in-bounds={safety['edge_in_bounds']})")
+    print(f"kelly_multiplier:  {safety['kelly_multiplier']:.4f} (in-bounds={safety['kelly_in_bounds']})")
+    print(f"Overall safe:      {safety['safe']}")
     print("========================")
 
 if __name__ == "__main__":

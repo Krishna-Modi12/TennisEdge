@@ -7,6 +7,8 @@ Commands:
     /buy         – credit packages info
     /beta        – join free beta channel
     /help        – usage guide
+    /dashboard   – performance analytics
+    /retrain     – admin: retrain ML model
     /scan        – admin: run pipeline manually
     /addcredits  – admin: top up credits
     /broadcastbeta – admin: invite all users to beta channel
@@ -18,6 +20,8 @@ import os
 import time
 import traceback
 import threading
+from dotenv import load_dotenv
+load_dotenv()
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 # ── Health-check HTTP server (must start before heavy imports) ───────────────
@@ -145,6 +149,14 @@ async def post_init(app: Application) -> None:
     loop = asyncio.get_running_loop()
     set_loop(loop)
     logger.info("post_init: live event loop captured for scheduler.")
+
+    # Start Real-time Streaming Engine
+    try:
+        from streaming.prediction_worker import run_engine
+        asyncio.create_task(run_engine())
+        logger.info("🚀 Real-time Streaming Engine started in post_init.")
+    except Exception as e:
+        logger.error(f"Failed to start Streaming Engine: {e}")
 
 
 def _main_menu_keyboard():
@@ -308,6 +320,46 @@ async def signals(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             logger.error(f"On-demand pipeline error: {e}")
     msg = format_signal_list(recent)
     await update.message.reply_text(msg, parse_mode="Markdown")
+
+
+# ── /dashboard ───────────────────────────────────────────────────────────────
+
+async def dashboard(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Show system performance dashboard."""
+    from database.db import get_live_performance_stats
+    stats = get_live_performance_stats()
+    
+    msg = (
+        "📊 *TennisEdge Performance Dashboard*\n"
+        "━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"✅ *Total Signals:* {stats['total']}\n"
+        f"🎯 *Win Rate:* {stats['win_rate']:.1f}%\n"
+        f"💰 *Estimated ROI:* {stats['roi']:.1f}%\n"
+        f"🧠 *Avg Value Edge:* +{stats['avg_edge']:.1f}%\n\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        f"_Live tracking since system launch_"
+    )
+    await update.message.reply_text(msg, parse_mode="Markdown")
+
+
+# ── /retrain ─────────────────────────────────────────────────────────────────
+
+async def retrain(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Admin only: trigger ML model retraining."""
+    if update.effective_user.id != TELEGRAM_ADMIN_ID:
+        await update.message.reply_text("❌ Admin access required.")
+        return
+        
+    await update.message.reply_text("🧠 *Retraining ML Model...*\nThis may take a minute.", parse_mode="Markdown")
+    try:
+        from train_ml_model import main as run_training
+        # Run in executor to avoid blocking the bot
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, run_training)
+        await update.message.reply_text("✅ *ML Model Retrained Successfully!*", parse_mode="Markdown")
+    except Exception as e:
+        logger.error(f"Retraining error: {e}")
+        await update.message.reply_text(f"❌ *Retraining Failed:* {e}", parse_mode="Markdown")
 
 
 # ── /matches ─────────────────────────────────────────────────────────────────
@@ -1524,8 +1576,10 @@ def main():
     app.add_handler(CommandHandler("beta",       beta))
     app.add_handler(CommandHandler("help",       help_cmd))
     app.add_handler(CommandHandler("menu",       menu_cmd))
+    app.add_handler(CommandHandler("dashboard",  dashboard))
     # Admin commands
     app.add_handler(CommandHandler("scan",       scan))
+    app.add_handler(CommandHandler("retrain",    retrain))
     app.add_handler(CommandHandler("addcredits", addcredits))
     app.add_handler(CommandHandler("broadcastbeta", broadcastbeta))
     app.add_handler(CommandHandler("backtest",   backtest_cmd))

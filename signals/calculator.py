@@ -33,6 +33,7 @@ from models.ensemble_model import combine_ensemble_probability
 from models.advanced_model import advanced_predict
 from models.player_strength import predict_strength_prob
 from models.simulator import simulate_match_probability
+from ml.predict_model import predict_match_ml_probability
 
 log = logging.getLogger(__name__)
 
@@ -54,6 +55,11 @@ CALIBRATION_MODEL_WEIGHT = 0.75
 CALIBRATION_MARKET_WEIGHT = 0.25
 CALIBRATION_MAX_GAP = 0.25
 MC_SIMULATION_RUNS = int(os.getenv("MC_SIMULATION_RUNS", "3000"))
+EDGE_BASE_MIN = 0.03
+EDGE_BASE_MAX = 0.06
+EDGE_THRESHOLD_MAX = 0.08
+KELLY_MULT_MIN = 0.25
+KELLY_MULT_MAX = 1.25
 
 # ── Tournament filter keywords ───────────────────────────────────────────────
 
@@ -242,12 +248,15 @@ def compute_dynamic_edge_threshold(volatility: float) -> float:
         base_low = float(get_model_parameter("dynamic_edge_base", 0.04))
     except Exception:
         base_low = 0.04
+    base_low = max(EDGE_BASE_MIN, min(EDGE_BASE_MAX, base_low))
     v = max(0.0, float(volatility or 0.0))
     if v < 0.03:
-        return base_low
-    if v <= 0.08:
-        return base_low + 0.01
-    return base_low + 0.02
+        threshold = base_low
+    elif v <= 0.08:
+        threshold = base_low + 0.01
+    else:
+        threshold = base_low + 0.02
+    return min(EDGE_THRESHOLD_MAX, threshold)
 
 
 def compute_kelly_fraction(probability: float, odds: float) -> float:
@@ -269,6 +278,7 @@ def compute_kelly_fraction(probability: float, odds: float) -> float:
         kelly_multiplier = float(get_model_parameter("kelly_multiplier", 1.0))
     except Exception:
         kelly_multiplier = 1.0
+    kelly_multiplier = max(KELLY_MULT_MIN, min(KELLY_MULT_MAX, kelly_multiplier))
     return min(0.05, (0.5 * full_kelly) * kelly_multiplier)
 
 
@@ -424,11 +434,36 @@ def calculate_signal(match: dict) -> Optional[dict]:
         except Exception:
             mc_prob_a = None
 
+    ml_prob_a = None
+    try:
+        ml_prob_a = predict_match_ml_probability(
+            {
+                "surface": surface,
+                "model_prob": model_data.get("prob_a"),
+                "market_prob": market_prob_a,
+                "calibrated_prob": model_data.get("prob_a"),
+                "raw_model_prob": model_data.get("prob_a"),
+                "edge": ((model_data.get("prob_a", 0.5) * odd_a) - 1.0) if odd_a else 0.0,
+                "odds": odd_a if odd_a else 2.0,
+                "volatility": vol_a,
+                "edge_threshold": compute_dynamic_edge_threshold(vol_a),
+                "kelly_fraction": compute_kelly_fraction(model_data.get("prob_a", 0.5), odd_a or 2.0),
+                "elo_component_prob": model_data.get("elo_prob_a"),
+                "strength_component_prob": strength_prob_a,
+                "mc_component_prob": mc_prob_a,
+                "market_component_prob": market_prob_a,
+                "ensemble_prob": model_data.get("prob_a"),
+            }
+        )
+    except Exception:
+        ml_prob_a = None
+
     raw_model_prob_a, ensemble_payload = combine_ensemble_probability(
         elo_prob=model_data.get("elo_prob_a", model_data["prob_a"]),
         strength_prob=strength_prob_a,
         mc_prob=mc_prob_a,
         market_prob=market_prob_a,
+        ml_prob=ml_prob_a,
     )
     raw_model_prob_b = 1.0 - raw_model_prob_a
     calibrated_prob_a = calibrate_probability(raw_model_prob_a, market_prob_a)
@@ -467,6 +502,7 @@ def calculate_signal(match: dict) -> Optional[dict]:
             "strength_component_prob": components.get("strength_prob"),
             "mc_component_prob": components.get("mc_prob"),
             "market_component_prob": components.get("market_prob"),
+            "ml_component_prob": components.get("ml_prob"),
             "ensemble_prob": components.get("ensemble_prob"),
         }
 
@@ -481,6 +517,7 @@ def calculate_signal(match: dict) -> Optional[dict]:
         "strength_prob": (1.0 - ensemble_payload["strength_prob"]) if ensemble_payload.get("strength_prob") is not None else None,
         "mc_prob": (1.0 - ensemble_payload["mc_prob"]) if ensemble_payload.get("mc_prob") is not None else None,
         "market_prob": 1.0 - ensemble_payload.get("market_prob", 0.5),
+        "ml_prob": (1.0 - ensemble_payload["ml_prob"]) if ensemble_payload.get("ml_prob") is not None else None,
         "ensemble_prob": 1.0 - ensemble_payload.get("ensemble_prob", 0.5),
     }
     sig_b = get_side_signal(
@@ -588,6 +625,7 @@ def process_matches(matches: list[dict]) -> list[dict]:
                     strength_component_prob=result.get("strength_component_prob"),
                     mc_component_prob=result.get("mc_component_prob"),
                     market_component_prob=result.get("market_component_prob"),
+                    ml_component_prob=result.get("ml_component_prob"),
                     ensemble_prob=result.get("ensemble_prob"),
                     edge=result["true_edge_score"],
                     odds=result["odds"],

@@ -53,15 +53,17 @@ def format_signal(signal: dict) -> str:
 
     ev_score = signal.get("ev_score", 0)
     if ev_score >= 0.06:
-        tier_label = "🔥 *Strong Value Bet*"
+        tier_label = "💎 *ELITE VALUE BET*"
     elif ev_score >= 0.04:
-        tier_label = "⚡️ *Medium Value Bet*"
+        tier_label = "🔥 *STRONG VALUE BET*"
+    elif ev_score >= 0.02:
+        tier_label = "⚡️ *POTENTIAL VALUE*"
     else:
-        tier_label = "📈 *Small Value Bet*"
+        tier_label = "📈 *MARKET OPPORTUNITY*"
 
     msg = (
         f"{tier_label}\n"
-        f"🎾 *TENNISEDGE SIGNAL*\n"
+        f"🎾 *TENNISEDGE PREDICTOR*\n"
         f"━━━━━━━━━━━━━━━━━━━\n\n"
         f"🏆 *Tournament*\n"
         f"{tournament}\n\n"
@@ -82,7 +84,6 @@ def format_signal(signal: dict) -> str:
 
     msg += (
         f"💎 *Value Edge:* +{value_edge_pct}%\n"
-        f"🧠 *Confidence:* {confidence:.2f}x\n"
         f"🔥 *True Edge Score: +{true_edge_pct}%*\n"
         f"🎯 *EV Score: {ev_score:.3f}*\n\n"
     )
