@@ -65,7 +65,7 @@ def detect_edges(matches: list) -> list:
     Run dual-validation edge detection using the new Multi-Factor Weighting logic.
     """
     signals, _ = process_matches(matches)
-    return signals
+    return sorted(signals, key=lambda s: s.get("ev_score", float("-inf")), reverse=True)
 
 
 

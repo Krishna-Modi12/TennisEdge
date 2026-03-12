@@ -12,10 +12,14 @@ from unittest.mock import patch
 # Ensure project root is on path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+from config import get_surface, normalize_tournament_name
 from signals.calculator import (
     safe_float,
     is_allowed_tournament,
     calculate_pinnacle_prob,
+    calibrate_probability,
+    compute_dynamic_edge_threshold,
+    compute_kelly_fraction,
     is_match_within_window,
     calculate_signal,
     process_matches,
@@ -169,13 +173,13 @@ class TestPinnacleProb(unittest.TestCase):
 
     def test_normal_margin_accepted(self):
         """Normal Pinnacle margin (1.02–1.06) must pass."""
-        # 1/1.85 + 1/2.10 ≈ 1.017 — typical Pinnacle two-way tennis market
-        prob = calculate_pinnacle_prob(1.85, 2.10)
+        # 1/1.80 + 1/2.00 ≈ 1.0556 — valid tight two-way market
+        prob = calculate_pinnacle_prob(1.80, 2.00)
         self.assertGreater(prob, 0.0)
         self.assertLess(prob, 1.0)
 
     def test_impossible_margin_raises(self):
-        """Margin < 1.0 is impossible — must raise."""
+        """Margin below the configured floor must raise."""
         with self.assertRaises(ValueError):
             # 1/50 + 1/50 = 0.04 < 1.0
             calculate_pinnacle_prob(50.0, 50.0)
@@ -196,9 +200,29 @@ class TestPinnacleProb(unittest.TestCase):
     def test_prob_is_clamped(self):
         """Probability must be clamped between 0.001 and 0.999."""
         # Normal case — prob should be reasonable
-        prob = calculate_pinnacle_prob(1.85, 2.10)
+        prob = calculate_pinnacle_prob(1.80, 2.00)
         self.assertGreaterEqual(prob, 0.001)
         self.assertLessEqual(prob, 0.999)
+
+
+class TestCalibrationAndRisk(unittest.TestCase):
+    def test_probability_calibration_weighting(self):
+        calibrated = calibrate_probability(0.60, 0.50)
+        self.assertAlmostEqual(calibrated, 0.575, places=3)
+
+    def test_probability_calibration_extreme_gap_uses_average(self):
+        calibrated = calibrate_probability(0.90, 0.20)
+        self.assertAlmostEqual(calibrated, 0.55, places=3)
+
+    def test_dynamic_edge_threshold_bands(self):
+        self.assertEqual(compute_dynamic_edge_threshold(0.02), 0.04)
+        self.assertEqual(compute_dynamic_edge_threshold(0.05), 0.05)
+        self.assertEqual(compute_dynamic_edge_threshold(0.12), 0.06)
+
+    def test_half_kelly_capped(self):
+        f = compute_kelly_fraction(0.65, 2.2)
+        self.assertGreaterEqual(f, 0.0)
+        self.assertLessEqual(f, 0.05)
 
 
 class TestOddsSanityBounds(unittest.TestCase):
@@ -224,6 +248,29 @@ class TestSuspiciousOddsGap(unittest.TestCase):
         """Extreme odds gap between player and opponent → rejected."""
         match = _base_match(pinny_odds_a=1.05, pinny_odds_b=25.0, odds_a=1.10)
         self.assertIsNone(calculate_signal(match))
+
+
+class TestSurfaceMapping(unittest.TestCase):
+    def test_get_surface_uses_known_tournament_mapping(self):
+        self.assertEqual(get_surface("Wimbledon"), "grass")
+        self.assertEqual(get_surface("Roland Garros"), "clay")
+        self.assertEqual(get_surface("French Open"), "clay")
+        self.assertEqual(get_surface("Monte Carlo Masters"), "clay")
+        self.assertEqual(get_surface("Madrid Open"), "clay")
+        self.assertEqual(get_surface("ATP Miami Open"), "hard")
+
+    def test_get_surface_defaults_to_hard(self):
+        self.assertEqual(get_surface("Unknown Invitational"), "hard")
+
+    def test_tournament_name_normalization_handles_hyphen_and_spaces(self):
+        self.assertEqual(normalize_tournament_name("ATP-500 Madrid"), "atp 500 madrid")
+        self.assertEqual(normalize_tournament_name("  ATP   Madrid  "), "atp madrid")
+
+    def test_get_surface_with_inconsistent_tournament_formats(self):
+        self.assertEqual(get_surface("ATP Madrid"), "clay")
+        self.assertEqual(get_surface("ATP Madrid Qualifiers"), "clay")
+        self.assertEqual(get_surface("Madrid Masters"), "clay")
+        self.assertEqual(get_surface("ATP-500 Madrid"), "clay")
 
 
 class TestMatchTimingWindow(unittest.TestCase):

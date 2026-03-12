@@ -6,7 +6,7 @@ Signal fires ONLY when ALL conditions are met:
   1. Tournament is allowed (tier label or tour keyword in name)
   2. Match is within timing window
   3. Odds are within sanity bounds
-  4. Pinnacle margin is valid (1.00–1.15)
+  4. Pinnacle margin is valid (1.02–1.07)
   5. Pinnacle odds ratio is not suspicious (≤20x)
   6. Value Edge ≥ MIN_VALUE_EDGE
   7. Model Prob ≥ MIN_MODEL_PROB
@@ -26,9 +26,13 @@ import os
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
-from database.db import signal_exists, save_signal
+from config import DEFAULT_BANKROLL, get_surface
+from database.db import get_model_parameter, signal_exists, save_signal
 from integrations.tennis_api import search_player
+from models.ensemble_model import combine_ensemble_probability
 from models.advanced_model import advanced_predict
+from models.player_strength import predict_strength_prob
+from models.simulator import simulate_match_probability
 
 log = logging.getLogger(__name__)
 
@@ -42,10 +46,14 @@ ELO_MAX_DISAGREE        = 0.15      # max gap between Pinnacle & Elo probs
 MIN_ODDS                = 1.01      # below this is not valid decimal odds
 MAX_ODDS                = 100.0     # above this is API corruption
 MAX_ODDS_RATIO          = 20.0      # max ratio between player/opponent odds
-PINNACLE_MARGIN_MIN     = 1.00      # below this is impossible (sub-100% book)
-PINNACLE_MARGIN_MAX     = 1.15      # above this is not Pinnacle (too high margin)
+PINNACLE_MARGIN_MIN     = 1.02      # tighter valid range for Pinnacle-like two-way markets
+PINNACLE_MARGIN_MAX     = 1.07
 MAX_SIGNALS_PER_SCAN    = int(os.getenv("MAX_SIGNALS_PER_SCAN", "10"))
 MAX_HOURS_BEFORE_MATCH  = int(os.getenv("MAX_HOURS_BEFORE_MATCH", "24"))
+CALIBRATION_MODEL_WEIGHT = 0.75
+CALIBRATION_MARKET_WEIGHT = 0.25
+CALIBRATION_MAX_GAP = 0.25
+MC_SIMULATION_RUNS = int(os.getenv("MC_SIMULATION_RUNS", "3000"))
 
 # ── Tournament filter keywords ───────────────────────────────────────────────
 
@@ -187,7 +195,7 @@ def calculate_pinnacle_prob(pin_player: float, pin_opponent: float) -> float:
     if margin < PINNACLE_MARGIN_MIN:
         raise ValueError(
             f"Pinnacle margin {margin:.4f} < {PINNACLE_MARGIN_MIN} — "
-            f"impossible (sub-100% book). Odds pair is corrupted. "
+            f"too low for a valid Pinnacle market pair. "
             f"player={pin_player}, opponent={pin_opponent}"
         )
 
@@ -200,6 +208,74 @@ def calculate_pinnacle_prob(pin_player: float, pin_opponent: float) -> float:
 
     prob = raw_p / margin
     return max(0.001, min(0.999, prob))
+
+
+def is_margin_valid(pinnacle_odds_a: float, pinnacle_odds_b: float) -> bool:
+    """Return True only when two-way Pinnacle margin is within the safe range."""
+    if pinnacle_odds_a is None or pinnacle_odds_b is None:
+        return False
+    if pinnacle_odds_a <= 1.0 or pinnacle_odds_b <= 1.0:
+        return False
+    try:
+        margin = (1.0 / pinnacle_odds_a) + (1.0 / pinnacle_odds_b)
+    except ZeroDivisionError:
+        return False
+    return PINNACLE_MARGIN_MIN <= margin <= PINNACLE_MARGIN_MAX
+
+
+def calibrate_probability(model_prob: float, market_fair_prob: float) -> float:
+    """
+    Calibrate model probability toward market fair probability.
+    Default: 75% model + 25% market.
+    Safety: when disagreement is extreme (> 0.25), use simple average.
+    """
+    mp = max(0.001, min(0.999, float(model_prob)))
+    mk = max(0.001, min(0.999, float(market_fair_prob)))
+    if abs(mp - mk) > CALIBRATION_MAX_GAP:
+        return (mp + mk) / 2.0
+    return (CALIBRATION_MODEL_WEIGHT * mp) + (CALIBRATION_MARKET_WEIGHT * mk)
+
+
+def compute_dynamic_edge_threshold(volatility: float) -> float:
+    """Volatility-based edge thresholding."""
+    try:
+        base_low = float(get_model_parameter("dynamic_edge_base", 0.04))
+    except Exception:
+        base_low = 0.04
+    v = max(0.0, float(volatility or 0.0))
+    if v < 0.03:
+        return base_low
+    if v <= 0.08:
+        return base_low + 0.01
+    return base_low + 0.02
+
+
+def compute_kelly_fraction(probability: float, odds: float) -> float:
+    """
+    Half-Kelly fraction with safety cap.
+    f_full = (b*p - q) / b where b = odds - 1, q = 1-p
+    return min(0.05, 0.5 * max(0, f_full))
+    """
+    p = float(probability or 0.0)
+    o = float(odds or 0.0)
+    b = o - 1.0
+    if b <= 0:
+        return 0.0
+    q = 1.0 - p
+    full_kelly = ((b * p) - q) / b
+    if full_kelly <= 0:
+        return 0.0
+    try:
+        kelly_multiplier = float(get_model_parameter("kelly_multiplier", 1.0))
+    except Exception:
+        kelly_multiplier = 1.0
+    return min(0.05, (0.5 * full_kelly) * kelly_multiplier)
+
+
+def _compute_volatility(current_odds: Optional[float], opening_odds: Optional[float]) -> float:
+    if not current_odds or not opening_odds or opening_odds <= 0:
+        return 0.0
+    return abs(float(current_odds) - float(opening_odds)) / float(opening_odds)
 
 
 def _extract_odds(match: dict, keys: list[str]) -> Optional[float]:
@@ -283,7 +359,11 @@ def calculate_signal(match: dict) -> Optional[dict]:
     player_a      = match.get("player_a", "Unknown")
     player_b      = match.get("player_b", "Unknown")
     tournament    = match.get("tournament", "Unknown")
-    surface       = match.get("surface", "hard")
+    raw_surface   = str(match.get("surface", "") or "").strip().lower()
+    if raw_surface in {"hard", "clay", "grass", "carpet"}:
+        surface = raw_surface
+    else:
+        surface = get_surface(tournament)
     tier          = match.get("tier")
 
     # ── Guard: Tournament filter ──────────────────────────────────────────
@@ -304,28 +384,62 @@ def calculate_signal(match: dict) -> Optional[dict]:
     if pin_a is None or pin_b is None:
         return None
 
+    open_a = _extract_odds(match, ["opening_odds_a", "open_odds_a", "odds_open_a", "opening_a"])
+    open_b = _extract_odds(match, ["opening_odds_b", "open_odds_b", "odds_open_b", "opening_b"])
+    vol_a = _compute_volatility(odd_a, open_a)
+    vol_b = _compute_volatility(odd_b, open_b)
+
     # ── Advanced Model Factors ────────────────────────────────────────────
     model_data = advanced_predict(player_a, player_b, surface)
 
     # Pinnacle margin check
-    try:
-        raw_p = 1.0 / pin_a
-        raw_o = 1.0 / pin_b
-        margin = raw_p + raw_o
-        if not (PINNACLE_MARGIN_MIN <= margin <= PINNACLE_MARGIN_MAX):
-            return None
-    except ZeroDivisionError:
+    if not is_margin_valid(pin_a, pin_b):
         return None
 
     # Ratio check
     if (max(pin_a, pin_b) / min(pin_a, pin_b)) > MAX_ODDS_RATIO:
         return None
 
+    # Market fair probabilities from Pinnacle de-vig.
+    market_prob_a = calculate_pinnacle_prob(pin_a, pin_b)
+    market_prob_b = 1.0 - market_prob_a
+
+    strength_data = None
+    try:
+        strength_data = predict_strength_prob(player_a, player_b, surface)
+    except Exception:
+        strength_data = None
+
+    strength_prob_a = strength_data["prob_a"] if strength_data else model_data.get("strength_prob_a")
+    mc_prob_a = None
+    if strength_data:
+        try:
+            mc_prob_a = simulate_match_probability(
+                serve_strength_a=strength_data["serve_a"],
+                return_strength_a=strength_data["return_a"],
+                serve_strength_b=strength_data["serve_b"],
+                return_strength_b=strength_data["return_b"],
+                simulations=MC_SIMULATION_RUNS,
+            )
+        except Exception:
+            mc_prob_a = None
+
+    raw_model_prob_a, ensemble_payload = combine_ensemble_probability(
+        elo_prob=model_data.get("elo_prob_a", model_data["prob_a"]),
+        strength_prob=strength_prob_a,
+        mc_prob=mc_prob_a,
+        market_prob=market_prob_a,
+    )
+    raw_model_prob_b = 1.0 - raw_model_prob_a
+    calibrated_prob_a = calibrate_probability(raw_model_prob_a, market_prob_a)
+    calibrated_prob_b = calibrate_probability(raw_model_prob_b, market_prob_b)
+
     # ── Evaluate Sides ────────────────────────────────────────────────────
-    def get_side_signal(prob, odds, player_name, side_id):
+    def get_side_signal(prob, raw_prob, market_prob, odds, player_name, side_id, volatility, components):
         if not odds or odds < MIN_ODDS: return None
+        edge_threshold = compute_dynamic_edge_threshold(volatility)
         value_edge = (prob * odds) - 1.0
-        if value_edge < MIN_VALUE_EDGE: return None
+        if value_edge < edge_threshold: return None
         if prob < MIN_MODEL_PROB: return None
         
         # Elo check (using model factors)
@@ -342,16 +456,36 @@ def calculate_signal(match: dict) -> Optional[dict]:
             "bet_on": player_name,
             "odds": odds,
             "model_prob": prob,
+            "raw_model_prob": raw_prob,
+            "calibrated_prob": prob,
             "value_edge": value_edge,
             "true_edge_score": true_edge,
-            "market_prob": 1.0 / odds
+            "market_prob": market_prob,
+            "volatility": volatility,
+            "edge_threshold": edge_threshold,
+            "elo_component_prob": components.get("elo_prob"),
+            "strength_component_prob": components.get("strength_prob"),
+            "mc_component_prob": components.get("mc_prob"),
+            "market_component_prob": components.get("market_prob"),
+            "ensemble_prob": components.get("ensemble_prob"),
         }
 
-    prob_a = model_data["prob_a"]
-    prob_b = model_data["prob_b"]
+    prob_a = calibrated_prob_a
+    prob_b = calibrated_prob_b
 
-    sig_a = get_side_signal(prob_a, odd_a, player_a, "a")
-    sig_b = get_side_signal(prob_b, odd_b, player_b, "b")
+    sig_a = get_side_signal(
+        prob_a, raw_model_prob_a, market_prob_a, odd_a, player_a, "a", vol_a, ensemble_payload
+    )
+    components_b = {
+        "elo_prob": 1.0 - ensemble_payload.get("elo_prob", 0.5),
+        "strength_prob": (1.0 - ensemble_payload["strength_prob"]) if ensemble_payload.get("strength_prob") is not None else None,
+        "mc_prob": (1.0 - ensemble_payload["mc_prob"]) if ensemble_payload.get("mc_prob") is not None else None,
+        "market_prob": 1.0 - ensemble_payload.get("market_prob", 0.5),
+        "ensemble_prob": 1.0 - ensemble_payload.get("ensemble_prob", 0.5),
+    }
+    sig_b = get_side_signal(
+        prob_b, raw_model_prob_b, market_prob_b, odd_b, player_b, "b", vol_b, components_b
+    )
 
     best = None
     if sig_a and sig_b:
@@ -371,6 +505,7 @@ def calculate_signal(match: dict) -> Optional[dict]:
         "form_prob":    model_data.get("form_prob_a") if is_a else (1.0 - model_data.get("form_prob_a", 0.5)),
         "surface_prob": model_data.get("surface_prob_a") if is_a else (1.0 - model_data.get("surface_prob_a", 0.5)),
         "h2h_prob":     model_data.get("h2h_prob_a") if is_a else (1.0 - model_data.get("h2h_prob_a", 0.5)),
+        "strength_prob": model_data.get("strength_prob_a") if is_a else (1.0 - model_data.get("strength_prob_a", 0.5)),
         "h2h_wins_a":   model_data.get("h2h_wins_a", 0),
         "h2h_wins_b":   model_data.get("h2h_wins_b", 0),
         "data_quality": model_data.get("data_quality", "elo_only")
@@ -385,8 +520,11 @@ def calculate_signal(match: dict) -> Optional[dict]:
         "ev_score": round(best["value_edge"] * best["model_prob"], 4),
         "confidence": best["true_edge_score"] / best["value_edge"]
                       if best["value_edge"] > 0 else 1.0,
-        "probability_source": "pinnacle_devig"
+        "probability_source": "pinnacle_devig",
+        "bankroll_assumed": DEFAULT_BANKROLL,
+        "recommended_bet_fraction": round(compute_kelly_fraction(best["model_prob"], best["odds"]), 4),
     }
+    res["recommended_bet_size"] = round(res["bankroll_assumed"] * res["recommended_bet_fraction"], 2)
     
     log.info("SIGNAL [%s] %s @ %.2f | Edge: %.1f%%", match_id, best["bet_on"], best["odds"], best["true_edge_score"]*100)
     return res
@@ -444,8 +582,19 @@ def process_matches(matches: list[dict]) -> list[dict]:
                     bet_on=result["bet_on"],
                     model_prob=result["model_prob"],
                     market_prob=result["market_prob"],
+                    calibrated_prob=result.get("calibrated_prob"),
+                    raw_model_prob=result.get("raw_model_prob"),
+                    elo_component_prob=result.get("elo_component_prob"),
+                    strength_component_prob=result.get("strength_component_prob"),
+                    mc_component_prob=result.get("mc_component_prob"),
+                    market_component_prob=result.get("market_component_prob"),
+                    ensemble_prob=result.get("ensemble_prob"),
                     edge=result["true_edge_score"],
-                    odds=result["odds"]
+                    odds=result["odds"],
+                    volatility=result.get("volatility"),
+                    edge_threshold=result.get("edge_threshold"),
+                    kelly_fraction=result.get("recommended_bet_fraction"),
+                    recommended_bet_size=result.get("recommended_bet_size"),
                 )
             except Exception as e:
                 log.warning("save_signal skipped for %s: %s",

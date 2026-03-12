@@ -14,6 +14,7 @@ the live loop, guaranteeing we capture the correct running loop.
 
 import asyncio
 import datetime as dt
+import hashlib
 import os
 import threading
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -47,12 +48,39 @@ def set_loop(loop: asyncio.AbstractEventLoop):
 
 async def _send_signal_to_subscribers(signal: dict):
     """Async: send one signal to every subscriber who has credits."""
-    from database.db import get_all_subscribers, deduct_credit, get_user
+    from database.db import (
+        get_all_subscribers,
+        deduct_credit,
+        get_user,
+        is_signal_alert_sent,
+        record_signal_alert,
+    )
     from signals.formatter import format_signal, format_signal_with_ai
 
     if _bot_app is None:
         print("[Scheduler] Bot app not set — cannot send signals.")
         return
+
+    match_id = str(signal.get("match_id") or "").strip()
+    market = str(signal.get("market") or "match_winner").strip()
+    selection = str(signal.get("bet_on") or "").strip()
+    normalized_selection = selection.lower().strip()
+    signal_hash = ""
+    if match_id and market and normalized_selection:
+        signal_hash = hashlib.sha1(
+            f"{match_id}:{market}:{normalized_selection}".encode()
+        ).hexdigest()
+
+    if signal_hash:
+        try:
+            if is_signal_alert_sent(signal_hash):
+                print(
+                    f"[Scheduler] Duplicate alert skipped for match_id={match_id}, "
+                    f"hash={signal_hash}"
+                )
+                return
+        except Exception as e:
+            print(f"[Scheduler] Duplicate-check error (continuing): {e}")
 
     # Generate AI analysis (non-blocking, fails gracefully)
     ai_text = ""
@@ -76,6 +104,7 @@ async def _send_signal_to_subscribers(signal: dict):
 
     subscribers = get_all_subscribers()
     msg = format_signal_with_ai(signal, ai_text) if ai_text else format_signal(signal)
+    sent_any = False
 
     for telegram_id in subscribers:
         user = get_user(telegram_id)
@@ -103,8 +132,16 @@ async def _send_signal_to_subscribers(signal: dict):
             deduct_credit(user["id"])
             if signal.get("signal_id"):
                 record_delivery(signal["signal_id"], user["id"])
+            sent_any = True
+            await asyncio.sleep(0.3)  # Telegram rate limit protection
         except Exception as e:
             print(f"[Scheduler] Failed to send to {telegram_id}: {e}")
+
+    if sent_any and signal_hash:
+        try:
+            record_signal_alert(signal_hash, match_id)
+        except Exception as e:
+            print(f"[Scheduler] Failed to persist sent alert state: {e}")
 
 
 def _run_daily_elo_update_worker(target_date: dt.date):
@@ -153,12 +190,25 @@ def run_pipeline():
     """
     print("[Scheduler] Running pipeline...")
     
+    # 0. Track closing line value for matches starting soon
+    try:
+        from signals.closing_line_tracker import track_closing_lines
+        track_closing_lines()
+    except Exception as e:
+        print(f"[Scheduler] CLV tracking error: {e}")
+
     # 1. Resolve pending paper trades first
     try:
         from ingestion.resolve_matches import resolve_pending_signals
         resolve_pending_signals()
     except Exception as e:
         print(f"[Scheduler] Paper trade resolution error: {e}")
+    # 1a. Sync ROI/CLV performance table for resolved signals
+    try:
+        from signals.result_tracker import sync_signal_performance
+        sync_signal_performance(limit=500, stake=1.0)
+    except Exception as e:
+        print(f"[Scheduler] Result tracker sync error: {e}")
     # 1b. Daily Elo update (non-blocking secondary job)
     try:
         _trigger_daily_elo_update_if_due()
@@ -177,6 +227,12 @@ def run_pipeline():
     except Exception as e:
         print(f"[Scheduler] Edge detection error: {e}")
         return
+
+    signals = sorted(
+        signals,
+        key=lambda s: s.get("ev_score", float("-inf")),
+        reverse=True,
+    )
 
     if not signals:
         print("[Scheduler] No new signals this run.")
@@ -207,6 +263,19 @@ def start_scheduler():
         next_run_time=dt.datetime.utcnow(),
         replace_existing=True,
     )
+    try:
+        from scheduler.model_monitor_job import run_model_monitor_job
+
+        scheduler.add_job(
+            run_model_monitor_job,
+            trigger="cron",
+            hour=4,
+            minute=0,
+            id="model_monitor_job",
+            replace_existing=True,
+        )
+    except Exception as e:
+        print(f"[Scheduler] Model monitor job setup skipped: {e}")
     scheduler.start()
     print(
         f"[Scheduler] Started – pipeline runs every {POLL_INTERVAL_MINUTES} minutes "

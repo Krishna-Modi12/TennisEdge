@@ -7,6 +7,7 @@ Thread-safe via per-thread connections with psycopg2.
 import logging
 import re
 import threading
+import hashlib
 import psycopg2
 import psycopg2.extras
 from config import DATABASE_URL
@@ -101,8 +102,19 @@ _SCHEMA_STATEMENTS = [
         bet_on       TEXT,
         model_prob   REAL,
         market_prob  REAL,
+        calibrated_prob REAL,
+        raw_model_prob REAL,
+        elo_component_prob REAL,
+        strength_component_prob REAL,
+        mc_component_prob REAL,
+        market_component_prob REAL,
+        ensemble_prob REAL,
         edge         REAL,
         odds         REAL,
+        volatility   REAL,
+        edge_threshold REAL,
+        kelly_fraction REAL,
+        recommended_bet_size REAL,
         result       TEXT DEFAULT 'pending',
         result_recorded_at TIMESTAMP,
         created_at   TIMESTAMP DEFAULT NOW()
@@ -188,11 +200,64 @@ _SCHEMA_STATEMENTS = [
         updated_at    TIMESTAMP DEFAULT NOW(),
         UNIQUE(player_a, player_b, surface)
     )""",
+    """CREATE TABLE IF NOT EXISTS sent_signals (
+        signal_hash TEXT PRIMARY KEY,
+        match_id    TEXT NOT NULL,
+        sent_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )""",
+    """CREATE TABLE IF NOT EXISTS signal_performance (
+        id           SERIAL PRIMARY KEY,
+        match_id     TEXT,
+        surface      TEXT,
+        taken_odds   NUMERIC,
+        closing_odds NUMERIC,
+        model_prob   NUMERIC,
+        is_win       BOOLEAN,
+        clv_ratio    NUMERIC,
+        line_movement NUMERIC
+    )""",
+    """CREATE TABLE IF NOT EXISTS player_surface_stats (
+        id                    SERIAL PRIMARY KEY,
+        player_name           TEXT NOT NULL,
+        surface               TEXT NOT NULL,
+        service_points_won    NUMERIC DEFAULT 0,
+        total_service_points  NUMERIC DEFAULT 0,
+        return_points_won     NUMERIC DEFAULT 0,
+        total_return_points   NUMERIC DEFAULT 0,
+        serve_strength        NUMERIC,
+        return_strength       NUMERIC,
+        matches_counted       INTEGER DEFAULT 0,
+        updated_at            TIMESTAMP DEFAULT NOW(),
+        UNIQUE(player_name, surface)
+    )""",
+    """CREATE TABLE IF NOT EXISTS model_parameters (
+        name        TEXT PRIMARY KEY,
+        value_num   NUMERIC,
+        value_text  TEXT,
+        value_json  JSONB,
+        updated_at  TIMESTAMP DEFAULT NOW()
+    )""",
+    """CREATE TABLE IF NOT EXISTS backtest_results (
+        id             SERIAL PRIMARY KEY,
+        run_name       TEXT,
+        roi_pct        NUMERIC,
+        win_rate_pct   NUMERIC,
+        clv_avg        NUMERIC,
+        bankroll_start NUMERIC,
+        bankroll_end   NUMERIC,
+        summary        JSONB,
+        created_at     TIMESTAMP DEFAULT NOW()
+    )""",
     """CREATE TABLE IF NOT EXISTS unmatched_players (
         id         SERIAL PRIMARY KEY,
         name       TEXT UNIQUE NOT NULL,
         first_seen TIMESTAMP DEFAULT NOW()
     )""",
+    "CREATE INDEX IF NOT EXISTS idx_sent_signals_match ON sent_signals(match_id)",
+    "CREATE INDEX IF NOT EXISTS idx_signal_perf_match ON signal_performance(match_id)",
+    "CREATE INDEX IF NOT EXISTS idx_api_cache_expiry ON api_cache(expires_at)",
+    "CREATE INDEX IF NOT EXISTS idx_player_surface_stats_lookup ON player_surface_stats(player_name, surface)",
+    "CREATE INDEX IF NOT EXISTS idx_backtest_results_created_at ON backtest_results(created_at)",
 ]
 
 
@@ -206,6 +271,7 @@ def init_schema():
             conn.execute(stmt)
         conn.commit()
         _migrate_signals_result_columns(conn)
+        _migrate_risk_tables(conn)
         from signals.odds_movement import migrate_odds_movement
         migrate_odds_movement()
         logger.info("[DB] PostgreSQL schema ready.")
@@ -217,20 +283,165 @@ def init_schema():
 
 def _migrate_signals_result_columns(conn):
     """Add result-related columns on signals if they don't exist."""
-    cur = conn.execute(
-        "SELECT column_name FROM information_schema.columns "
-        "WHERE table_name = 'signals'"
-    )
-    columns = {row[0] for row in cur.fetchall()}
-    if "result" not in columns:
-        conn.execute("ALTER TABLE signals ADD COLUMN result TEXT DEFAULT 'pending'")
-        logger.info("[DB] Migrated: added 'result' column to signals.")
-    if "result_recorded_at" not in columns:
-        conn.execute("ALTER TABLE signals ADD COLUMN result_recorded_at TIMESTAMP")
-        logger.info("[DB] Migrated: added 'result_recorded_at' column to signals.")
-    if "closing_odds" not in columns:
-        conn.execute("ALTER TABLE signals ADD COLUMN closing_odds REAL")
-        logger.info("[DB] Migrated: added 'closing_odds' column to signals.")
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT column_name FROM information_schema.columns "
+            "WHERE table_name = 'signals'"
+        )
+        columns = {row[0] for row in cur.fetchall()}
+        if "result" not in columns:
+            cur.execute("ALTER TABLE signals ADD COLUMN result TEXT DEFAULT 'pending'")
+            logger.info("[DB] Migrated: added 'result' column to signals.")
+        if "result_recorded_at" not in columns:
+            cur.execute("ALTER TABLE signals ADD COLUMN result_recorded_at TIMESTAMP")
+            logger.info("[DB] Migrated: added 'result_recorded_at' column to signals.")
+        if "closing_odds" not in columns:
+            cur.execute("ALTER TABLE signals ADD COLUMN closing_odds REAL")
+            logger.info("[DB] Migrated: added 'closing_odds' column to signals.")
+        if "calibrated_prob" not in columns:
+            cur.execute("ALTER TABLE signals ADD COLUMN calibrated_prob REAL")
+            logger.info("[DB] Migrated: added 'calibrated_prob' column to signals.")
+        if "raw_model_prob" not in columns:
+            cur.execute("ALTER TABLE signals ADD COLUMN raw_model_prob REAL")
+            logger.info("[DB] Migrated: added 'raw_model_prob' column to signals.")
+        if "elo_component_prob" not in columns:
+            cur.execute("ALTER TABLE signals ADD COLUMN elo_component_prob REAL")
+            logger.info("[DB] Migrated: added 'elo_component_prob' column to signals.")
+        if "strength_component_prob" not in columns:
+            cur.execute("ALTER TABLE signals ADD COLUMN strength_component_prob REAL")
+            logger.info("[DB] Migrated: added 'strength_component_prob' column to signals.")
+        if "mc_component_prob" not in columns:
+            cur.execute("ALTER TABLE signals ADD COLUMN mc_component_prob REAL")
+            logger.info("[DB] Migrated: added 'mc_component_prob' column to signals.")
+        if "market_component_prob" not in columns:
+            cur.execute("ALTER TABLE signals ADD COLUMN market_component_prob REAL")
+            logger.info("[DB] Migrated: added 'market_component_prob' column to signals.")
+        if "ensemble_prob" not in columns:
+            cur.execute("ALTER TABLE signals ADD COLUMN ensemble_prob REAL")
+            logger.info("[DB] Migrated: added 'ensemble_prob' column to signals.")
+        if "volatility" not in columns:
+            cur.execute("ALTER TABLE signals ADD COLUMN volatility REAL")
+            logger.info("[DB] Migrated: added 'volatility' column to signals.")
+        if "edge_threshold" not in columns:
+            cur.execute("ALTER TABLE signals ADD COLUMN edge_threshold REAL")
+            logger.info("[DB] Migrated: added 'edge_threshold' column to signals.")
+        if "kelly_fraction" not in columns:
+            cur.execute("ALTER TABLE signals ADD COLUMN kelly_fraction REAL")
+            logger.info("[DB] Migrated: added 'kelly_fraction' column to signals.")
+        if "recommended_bet_size" not in columns:
+            cur.execute("ALTER TABLE signals ADD COLUMN recommended_bet_size REAL")
+            logger.info("[DB] Migrated: added 'recommended_bet_size' column to signals.")
+    conn.commit()
+
+
+def _migrate_risk_tables(conn):
+    """
+    Backward-compatible migrations for risk mitigation tables.
+    Safe to run repeatedly on startup.
+    """
+    with conn.cursor() as cur:
+        # sent_signals: move to signal_hash PK model while preserving existing rows.
+        cur.execute(
+            "SELECT column_name FROM information_schema.columns "
+            "WHERE table_name = 'sent_signals'"
+        )
+        sent_cols = {row[0] for row in cur.fetchall()}
+
+        if "signal_hash" not in sent_cols:
+            cur.execute("ALTER TABLE sent_signals ADD COLUMN signal_hash TEXT")
+            sent_cols.add("signal_hash")
+        if "match_id" not in sent_cols:
+            cur.execute("ALTER TABLE sent_signals ADD COLUMN match_id TEXT")
+            sent_cols.add("match_id")
+        if "sent_at" not in sent_cols:
+            cur.execute(
+                "ALTER TABLE sent_signals ADD COLUMN sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+            )
+            sent_cols.add("sent_at")
+
+        if {"market", "selection"}.issubset(sent_cols):
+            cur.execute(
+                "SELECT ctid, match_id, market, selection "
+                "FROM sent_signals WHERE signal_hash IS NULL"
+            )
+            for ctid, match_id, market, selection in cur.fetchall():
+                norm_selection = str(selection or "").lower().strip()
+                digest = hashlib.sha1(
+                    f"{match_id}:{market}:{norm_selection}".encode()
+                ).hexdigest()
+                cur.execute(
+                    "UPDATE sent_signals SET signal_hash = %s WHERE ctid = %s",
+                    (digest, ctid),
+                )
+        else:
+            cur.execute(
+                "SELECT ctid, match_id, sent_at FROM sent_signals WHERE signal_hash IS NULL"
+            )
+            for ctid, match_id, sent_at in cur.fetchall():
+                digest = hashlib.sha1(
+                    f"{match_id}:legacy:{sent_at}".encode()
+                ).hexdigest()
+                cur.execute(
+                    "UPDATE sent_signals SET signal_hash = %s WHERE ctid = %s",
+                    (digest, ctid),
+                )
+
+        cur.execute(
+            "DELETE FROM sent_signals a USING sent_signals b "
+            "WHERE a.ctid < b.ctid "
+            "AND a.signal_hash IS NOT NULL "
+            "AND a.signal_hash = b.signal_hash"
+        )
+        cur.execute(
+            "ALTER TABLE sent_signals "
+            "ALTER COLUMN signal_hash SET NOT NULL"
+        )
+        cur.execute("ALTER TABLE sent_signals DROP CONSTRAINT IF EXISTS sent_signals_pkey")
+        cur.execute("ALTER TABLE sent_signals ADD PRIMARY KEY (signal_hash)")
+
+        # signal_performance: ensure required columns exist.
+        cur.execute(
+            "SELECT column_name FROM information_schema.columns "
+            "WHERE table_name = 'signal_performance'"
+        )
+        perf_cols = {row[0] for row in cur.fetchall()}
+
+        if "surface" not in perf_cols:
+            cur.execute("ALTER TABLE signal_performance ADD COLUMN surface TEXT")
+        if "model_prob" not in perf_cols:
+            cur.execute("ALTER TABLE signal_performance ADD COLUMN model_prob NUMERIC")
+        if "is_win" not in perf_cols:
+            cur.execute("ALTER TABLE signal_performance ADD COLUMN is_win BOOLEAN")
+        if "line_movement" not in perf_cols:
+            cur.execute("ALTER TABLE signal_performance ADD COLUMN line_movement NUMERIC")
+
+        # Backfill from legacy columns when available.
+        cur.execute(
+            "SELECT column_name FROM information_schema.columns "
+            "WHERE table_name = 'signal_performance'"
+        )
+        perf_cols = {row[0] for row in cur.fetchall()}
+
+        if {"signal_id", "surface", "model_prob"}.issubset(perf_cols):
+            cur.execute(
+                "UPDATE signal_performance sp "
+                "SET surface = COALESCE(sp.surface, s.surface), "
+                "model_prob = COALESCE(sp.model_prob, s.model_prob) "
+                "FROM signals s "
+                "WHERE sp.signal_id = s.id "
+                "AND (sp.surface IS NULL OR sp.model_prob IS NULL)"
+            )
+
+        if {"result", "is_win"}.issubset(perf_cols):
+            cur.execute(
+                "UPDATE signal_performance "
+                "SET is_win = CASE "
+                "WHEN result = 'win' THEN TRUE "
+                "WHEN result = 'loss' THEN FALSE "
+                "ELSE NULL END "
+                "WHERE is_win IS NULL"
+            )
+
     conn.commit()
 
 
@@ -382,16 +593,43 @@ def signal_exists(match_id: str) -> bool:
         conn.rollback()
         raise
 
-def save_signal(match_id, tournament, surface, player_a, player_b,
-                bet_on, model_prob, market_prob, edge, odds) -> int:
+def save_signal(
+    match_id,
+    tournament,
+    surface,
+    player_a,
+    player_b,
+    bet_on,
+    model_prob,
+    market_prob,
+    edge,
+    odds,
+    calibrated_prob=None,
+    raw_model_prob=None,
+    elo_component_prob=None,
+    strength_component_prob=None,
+    mc_component_prob=None,
+    market_component_prob=None,
+    ensemble_prob=None,
+    volatility=None,
+    edge_threshold=None,
+    kelly_fraction=None,
+    recommended_bet_size=None,
+) -> int:
     conn = get_conn()
     try:
         cur = conn.execute(
             "INSERT INTO signals (match_id,tournament,surface,player_a,player_b,"
-            "bet_on,model_prob,market_prob,edge,odds) "
-            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id",
+            "bet_on,model_prob,market_prob,calibrated_prob,raw_model_prob,"
+            "elo_component_prob,strength_component_prob,mc_component_prob,market_component_prob,ensemble_prob,"
+            "edge,odds,"
+            "volatility,edge_threshold,kelly_fraction,recommended_bet_size) "
+            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id",
             (match_id, tournament, surface, player_a, player_b,
-             bet_on, model_prob, market_prob, edge, odds),
+             bet_on, model_prob, market_prob, calibrated_prob, raw_model_prob,
+             elo_component_prob, strength_component_prob, mc_component_prob,
+             market_component_prob, ensemble_prob,
+             edge, odds, volatility, edge_threshold, kelly_fraction, recommended_bet_size),
         )
         sid = cur.fetchone()[0]
         conn.commit()
@@ -417,6 +655,315 @@ def get_recent_signals(limit: int = 5) -> list:
                 "model_prob": float(r[6]), "market_prob": float(r[7]),
                 "edge": float(r[8]), "odds": float(r[9]),
                 "created_at": r[10],
+            }
+            for r in rows
+        ]
+    except Exception:
+        conn.rollback()
+        raise
+
+
+def is_signal_alert_sent(signal_hash: str) -> bool:
+    """Return True if this alert hash was sent in the last 6 hours."""
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT 1 FROM sent_signals "
+                "WHERE signal_hash = %s "
+                "AND sent_at > NOW() - INTERVAL '6 hours' "
+                "LIMIT 1",
+                (signal_hash,),
+            )
+            return cur.fetchone() is not None
+    except psycopg2.Error as e:
+        conn.rollback()
+        logger.warning("[DB] is_signal_alert_sent failed: %s", e)
+        raise
+
+
+def record_signal_alert(signal_hash: str, match_id: str) -> bool:
+    """Record or refresh a dispatched signal hash."""
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO sent_signals (signal_hash, match_id) VALUES (%s, %s) "
+                "ON CONFLICT (signal_hash) DO UPDATE "
+                "SET match_id = excluded.match_id, sent_at = CURRENT_TIMESTAMP",
+                (signal_hash, match_id),
+            )
+            conn.commit()
+            return cur.rowcount > 0
+    except psycopg2.Error as e:
+        conn.rollback()
+        logger.warning("[DB] record_signal_alert failed: %s", e)
+        raise
+
+
+def get_resolved_signals_for_performance(limit: int = 500) -> list:
+    """Fetch recently resolved signals required for performance/CLV tracking."""
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT match_id, surface, odds, closing_odds, model_prob, result "
+                "FROM signals "
+                "WHERE result IN ('win', 'loss', 'push') "
+                "ORDER BY result_recorded_at DESC NULLS LAST, id DESC "
+                "LIMIT %s",
+                (limit,),
+            )
+            rows = cur.fetchall()
+
+        mapped = []
+        for match_id, surface, taken_odds, closing_odds, model_prob, result in rows:
+            if result == "win":
+                is_win = True
+            elif result == "loss":
+                is_win = False
+            else:
+                is_win = None
+            mapped.append(
+                {
+                    "match_id": match_id,
+                    "surface": surface,
+                    "taken_odds": float(taken_odds) if taken_odds is not None else None,
+                    "closing_odds": float(closing_odds) if closing_odds is not None else None,
+                    "model_prob": float(model_prob) if model_prob is not None else None,
+                    "is_win": is_win,
+                    "result": result,
+                }
+            )
+        return mapped
+    except psycopg2.Error as e:
+        conn.rollback()
+        logger.warning("[DB] get_resolved_signals_for_performance failed: %s", e)
+        raise
+
+
+def upsert_signal_performance(
+    match_id: str,
+    surface: str,
+    taken_odds: float,
+    closing_odds: float = None,
+    model_prob: float = None,
+    is_win: bool = None,
+    clv_ratio: float = None,
+    line_movement: float = None,
+):
+    """Insert or update a tracked signal performance row by match_id."""
+    if not match_id:
+        return
+
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE signal_performance SET "
+                "surface = %s, taken_odds = %s, closing_odds = COALESCE(%s, closing_odds), "
+                "model_prob = %s, is_win = %s, clv_ratio = COALESCE(%s, clv_ratio), "
+                "line_movement = COALESCE(%s, line_movement) "
+                "WHERE match_id = %s",
+                (
+                    surface,
+                    taken_odds,
+                    closing_odds,
+                    model_prob,
+                    is_win,
+                    clv_ratio,
+                    line_movement,
+                    match_id,
+                ),
+            )
+            if cur.rowcount == 0:
+                cur.execute(
+                    "INSERT INTO signal_performance "
+                    "(match_id, surface, taken_odds, closing_odds, model_prob, is_win, clv_ratio, line_movement) "
+                    "VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+                    (
+                        match_id,
+                        surface,
+                        taken_odds,
+                        closing_odds,
+                        model_prob,
+                        is_win,
+                        clv_ratio,
+                        line_movement,
+                    ),
+                )
+        conn.commit()
+    except psycopg2.Error as e:
+        conn.rollback()
+        logger.warning("[DB] upsert_signal_performance failed: %s", e)
+        raise
+
+
+def get_recent_signal_performance(limit: int = 100) -> list:
+    """Fetch latest signal_performance rows for monitoring and tuning."""
+    conn = get_conn()
+    try:
+        cur = conn.execute(
+            "SELECT match_id, taken_odds, model_prob, is_win, clv_ratio, surface, line_movement "
+            "FROM signal_performance "
+            "WHERE taken_odds IS NOT NULL AND model_prob IS NOT NULL "
+            "ORDER BY id DESC "
+            "LIMIT %s",
+            (int(limit),),
+        )
+        rows = cur.fetchall()
+        out = []
+        for row in rows:
+            out.append(
+                {
+                    "match_id": row[0],
+                    "taken_odds": float(row[1]) if row[1] is not None else None,
+                    "model_prob": float(row[2]) if row[2] is not None else None,
+                    "is_win": row[3],
+                    "clv_ratio": float(row[4]) if row[4] is not None else None,
+                    "surface": row[5],
+                    "line_movement": float(row[6]) if row[6] is not None else None,
+                }
+            )
+        return out
+    except Exception:
+        conn.rollback()
+        raise
+
+
+def get_model_parameter(name: str, default=None):
+    """Get adaptive model parameter value by name."""
+    conn = get_conn()
+    try:
+        cur = conn.execute(
+            "SELECT value_num, value_text, value_json FROM model_parameters WHERE name = %s",
+            (name,),
+        )
+        row = cur.fetchone()
+        if not row:
+            return default
+        value_num, value_text, value_json = row
+        if value_json is not None:
+            return value_json
+        if value_num is not None:
+            return float(value_num)
+        if value_text is not None:
+            return value_text
+        return default
+    except Exception:
+        conn.rollback()
+        raise
+
+
+def set_model_parameter(name: str, value):
+    """Set or update adaptive model parameter value."""
+    conn = get_conn()
+    try:
+        value_num = None
+        value_text = None
+        value_json = None
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            value_num = float(value)
+        elif isinstance(value, (dict, list)):
+            value_json = psycopg2.extras.Json(value)
+        elif value is not None:
+            value_text = str(value)
+
+        conn.execute(
+            "INSERT INTO model_parameters (name, value_num, value_text, value_json, updated_at) "
+            "VALUES (%s, %s, %s, %s, NOW()) "
+            "ON CONFLICT (name) DO UPDATE SET "
+            "value_num = excluded.value_num, value_text = excluded.value_text, "
+            "value_json = excluded.value_json, updated_at = NOW()",
+            (name, value_num, value_text, value_json),
+        )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+
+
+def get_all_model_parameters() -> list:
+    """Return all adaptive model parameters."""
+    conn = get_conn()
+    try:
+        cur = conn.execute(
+            "SELECT name, value_num, value_text, value_json, updated_at "
+            "FROM model_parameters ORDER BY name"
+        )
+        rows = cur.fetchall()
+        out = []
+        for name, value_num, value_text, value_json, updated_at in rows:
+            if value_json is not None:
+                value = value_json
+            elif value_num is not None:
+                value = float(value_num)
+            else:
+                value = value_text
+            out.append({"name": name, "value": value, "updated_at": updated_at})
+        return out
+    except Exception:
+        conn.rollback()
+        raise
+
+
+def save_backtest_result(
+    run_name: str,
+    roi_pct: float,
+    win_rate_pct: float,
+    clv_avg: float = None,
+    bankroll_start: float = None,
+    bankroll_end: float = None,
+    summary: dict | None = None,
+) -> int:
+    """Persist one backtest run summary."""
+    conn = get_conn()
+    try:
+        cur = conn.execute(
+            "INSERT INTO backtest_results "
+            "(run_name, roi_pct, win_rate_pct, clv_avg, bankroll_start, bankroll_end, summary) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id",
+            (
+                run_name,
+                roi_pct,
+                win_rate_pct,
+                clv_avg,
+                bankroll_start,
+                bankroll_end,
+                psycopg2.extras.Json(summary) if summary is not None else None,
+            ),
+        )
+        backtest_id = cur.fetchone()[0]
+        conn.commit()
+        return backtest_id
+    except Exception:
+        conn.rollback()
+        raise
+
+
+def get_recent_backtest_results(limit: int = 20) -> list:
+    """Fetch recent persisted backtest summaries."""
+    conn = get_conn()
+    try:
+        cur = conn.execute(
+            "SELECT id, run_name, roi_pct, win_rate_pct, clv_avg, bankroll_start, bankroll_end, summary, created_at "
+            "FROM backtest_results "
+            "ORDER BY created_at DESC, id DESC "
+            "LIMIT %s",
+            (int(limit),),
+        )
+        rows = cur.fetchall()
+        return [
+            {
+                "id": r[0],
+                "run_name": r[1],
+                "roi_pct": float(r[2]) if r[2] is not None else None,
+                "win_rate_pct": float(r[3]) if r[3] is not None else None,
+                "clv_avg": float(r[4]) if r[4] is not None else None,
+                "bankroll_start": float(r[5]) if r[5] is not None else None,
+                "bankroll_end": float(r[6]) if r[6] is not None else None,
+                "summary": r[7],
+                "created_at": r[8],
             }
             for r in rows
         ]
@@ -624,8 +1171,10 @@ def resolve_player_name(name: str) -> str:
             # Search player_elo for names containing this last name
             with conn.cursor() as cur:
                 cur.execute(
-                    "SELECT DISTINCT player_name FROM player_elo "
-                    "WHERE player_name ILIKE %s ORDER BY matches_played DESC LIMIT 5",
+                    "SELECT player_name FROM player_elo "
+                    "WHERE player_name ILIKE %s "
+                    "GROUP BY player_name "
+                    "ORDER BY MAX(matches_played) DESC LIMIT 5",
                     (f"%{last_name}%",),
                 )
                 candidates = [r[0] for r in cur.fetchall()]
@@ -732,6 +1281,65 @@ def get_elo(player: str, surface: str) -> float:
         conn.rollback()
         raise
 
+
+def get_recent_player_matches_for_form(player: str, limit: int = 5) -> list:
+    """
+    Fetch the most recent Elo-history matches for a player.
+    Returns rows as:
+        [{"opponent": str, "surface": str, "actual_result": int}, ...]
+    where actual_result is 1 for win and 0 for loss.
+    """
+    player = resolve_player_name(player)
+    conn = get_conn()
+    try:
+        cur = conn.execute(
+            "SELECT winner, loser, surface "
+            "FROM elo_history "
+            "WHERE winner = %s OR loser = %s "
+            "ORDER BY event_date DESC, id DESC "
+            "LIMIT %s",
+            (player, player, int(limit)),
+        )
+        rows = cur.fetchall()
+        out = []
+        for winner, loser, surface in rows:
+            actual_result = 1 if winner == player else 0
+            opponent = loser if actual_result == 1 else winner
+            out.append(
+                {
+                    "opponent": opponent,
+                    "surface": surface,
+                    "actual_result": actual_result,
+                }
+            )
+        return out
+    except Exception:
+        conn.rollback()
+        raise
+
+
+def get_recent_match_count(player_name: str, days: int = 3) -> int:
+    """
+    Return count of matches found for a player in elo_history over the
+    trailing `days` window (inclusive).
+    """
+    player_name = resolve_player_name(player_name)
+    conn = get_conn()
+    try:
+        cur = conn.execute(
+            "SELECT COUNT(*) "
+            "FROM elo_history "
+            "WHERE (winner = %s OR loser = %s) "
+            "AND event_date >= (CURRENT_DATE - (%s * INTERVAL '1 day'))",
+            (player_name, player_name, int(days)),
+        )
+        row = cur.fetchone()
+        return int(row[0]) if row and row[0] is not None else 0
+    except Exception:
+        conn.rollback()
+        raise
+
+
 def upsert_elo(player: str, surface: str, new_rating: float):
     player = resolve_player_name(player)
     conn = get_conn()
@@ -835,6 +1443,154 @@ def upsert_player_stats(player: str, surface: str, form_score: float,
              form_score, surface_win_rate, matches_counted),
         )
         conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+
+
+def get_player_surface_stats(player: str, surface: str) -> dict:
+    """Fetch serve/return strength stats for a player on a given surface."""
+    player = resolve_player_name(player)
+    conn = get_conn()
+    try:
+        cur = conn.execute(
+            "SELECT serve_strength, return_strength, matches_counted, "
+            "service_points_won, total_service_points, return_points_won, total_return_points "
+            "FROM player_surface_stats "
+            "WHERE player_name=%s AND surface=%s",
+            (player, surface),
+        )
+        row = cur.fetchone()
+        if not row:
+            return None
+        return {
+            "serve_strength": float(row[0]) if row[0] is not None else None,
+            "return_strength": float(row[1]) if row[1] is not None else None,
+            "matches_counted": int(row[2] or 0),
+            "service_points_won": float(row[3]) if row[3] is not None else None,
+            "total_service_points": float(row[4]) if row[4] is not None else None,
+            "return_points_won": float(row[5]) if row[5] is not None else None,
+            "total_return_points": float(row[6]) if row[6] is not None else None,
+        }
+    except Exception:
+        conn.rollback()
+        raise
+
+
+def upsert_player_surface_stats(
+    player: str,
+    surface: str,
+    service_points_won: float,
+    total_service_points: float,
+    return_points_won: float,
+    total_return_points: float,
+    matches_counted: int,
+):
+    """
+    Upsert serve/return strength records.
+    Strength metrics:
+      serve_strength  = service_points_won / total_service_points
+      return_strength = return_points_won / total_return_points
+    """
+    player = resolve_player_name(player)
+    conn = get_conn()
+    try:
+        spw = float(service_points_won or 0.0)
+        tsp = float(total_service_points or 0.0)
+        rpw = float(return_points_won or 0.0)
+        trp = float(total_return_points or 0.0)
+
+        serve_strength = (spw / tsp) if tsp > 0 else None
+        return_strength = (rpw / trp) if trp > 0 else None
+
+        conn.execute(
+            "INSERT INTO player_surface_stats ("
+            "player_name, surface, service_points_won, total_service_points, "
+            "return_points_won, total_return_points, serve_strength, return_strength, matches_counted"
+            ") VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) "
+            "ON CONFLICT (player_name, surface) DO UPDATE SET "
+            "service_points_won=%s, total_service_points=%s, "
+            "return_points_won=%s, total_return_points=%s, "
+            "serve_strength=%s, return_strength=%s, matches_counted=%s, updated_at=NOW()",
+            (
+                player, surface, spw, tsp, rpw, trp, serve_strength, return_strength, matches_counted,
+                spw, tsp, rpw, trp, serve_strength, return_strength, matches_counted,
+            ),
+        )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+
+
+def upsert_player_surface_strength(
+    player: str,
+    surface: str,
+    serve_strength: float,
+    return_strength: float,
+    matches_counted: int,
+):
+    """
+    Convenience upsert when strengths are already computed.
+    Stores synthetic point totals to preserve ratio-based definitions.
+    """
+    denom = max(100.0, float(matches_counted or 0) * 100.0)
+    spw = max(0.0, min(1.0, float(serve_strength or 0.0))) * denom
+    rpw = max(0.0, min(1.0, float(return_strength or 0.0))) * denom
+    upsert_player_surface_stats(
+        player=player,
+        surface=surface,
+        service_points_won=spw,
+        total_service_points=denom,
+        return_points_won=rpw,
+        total_return_points=denom,
+        matches_counted=int(matches_counted or 0),
+    )
+
+
+def refresh_player_surface_stats_from_player_stats(min_matches: int = 8) -> int:
+    """
+    Populate player_surface_stats using existing player_stats rows.
+    Uses a conservative proxy transform from surface win-rate to serve/return
+    strengths when point-level stats are unavailable.
+    """
+    conn = get_conn()
+    try:
+        cur = conn.execute(
+            "SELECT player_name, surface, surface_win_rate, matches_counted "
+            "FROM player_stats "
+            "WHERE surface <> 'overall' "
+            "AND matches_counted >= %s "
+            "AND surface_win_rate IS NOT NULL",
+            (int(min_matches),),
+        )
+        rows = cur.fetchall()
+        updated = 0
+        for player_name, surface, surface_wr, matches_counted in rows:
+            wr = float(surface_wr)
+            # Conservative proxy mapping with tight bounds to avoid overfitting.
+            serve_strength = max(0.45, min(0.80, 0.62 + ((wr - 0.5) * 0.30)))
+            return_strength = max(0.25, min(0.55, 0.38 + ((wr - 0.5) * 0.24)))
+            denom = max(100.0, float(matches_counted or 0) * 100.0)
+            spw = serve_strength * denom
+            rpw = return_strength * denom
+            conn.execute(
+                "INSERT INTO player_surface_stats ("
+                "player_name, surface, service_points_won, total_service_points, "
+                "return_points_won, total_return_points, serve_strength, return_strength, matches_counted"
+                ") VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) "
+                "ON CONFLICT (player_name, surface) DO UPDATE SET "
+                "service_points_won=%s, total_service_points=%s, "
+                "return_points_won=%s, total_return_points=%s, "
+                "serve_strength=%s, return_strength=%s, matches_counted=%s, updated_at=NOW()",
+                (
+                    player_name, surface, spw, denom, rpw, denom, serve_strength, return_strength, matches_counted,
+                    spw, denom, rpw, denom, serve_strength, return_strength, matches_counted,
+                ),
+            )
+            updated += 1
+        conn.commit()
+        return updated
     except Exception:
         conn.rollback()
         raise

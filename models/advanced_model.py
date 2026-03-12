@@ -11,6 +11,7 @@ Graceful fallback: if stats are missing, falls back to pure Elo.
 
 from models.elo_model import predict as elo_predict
 from database.db import get_player_stats, get_h2h_record
+from models.player_strength import predict_strength_prob
 
 # Minimum sample sizes to avoid small-sample distortion
 MIN_FORM_MATCHES = 5
@@ -32,6 +33,16 @@ def advanced_predict(player_a: str, player_b: str, surface: str) -> dict:
     # Factor 1: Elo (always available)
     elo = elo_predict(player_a, player_b, surface)
     elo_prob_a = elo["prob_a"]
+
+    # Factor 1b: Serve/Return matchup strength (optional, blended into Elo factor)
+    strength_data = _get_strength_probs(player_a, player_b, surface)
+    has_strength = strength_data is not None
+    strength_prob_a = strength_data["prob_a"] if has_strength else 0.5
+    elo_prob_component_a = (
+        (0.75 * elo_prob_a) + (0.25 * strength_prob_a)
+        if has_strength
+        else elo_prob_a
+    )
 
     # Factor 2: Recent Form
     form_a, form_b = _get_form_scores(player_a, player_b)
@@ -56,7 +67,7 @@ def advanced_predict(player_a: str, player_b: str, surface: str) -> dict:
 
     # Blend probabilities with dynamic weighting
     if data_quality == "elo_only":
-        prob_a = elo_prob_a
+        prob_a = elo_prob_component_a
         form_prob_a = 0.5
         surf_prob_a = 0.5
         h2h_prob_a = 0.5
@@ -91,7 +102,7 @@ def advanced_predict(player_a: str, player_b: str, surface: str) -> dict:
         w_h2h /= total_w
 
         prob_a = (
-            w_elo * elo_prob_a +
+            w_elo * elo_prob_component_a +
             w_form * form_prob_a +
             w_surf * surf_prob_a +
             w_h2h * h2h_prob_a
@@ -118,6 +129,7 @@ def advanced_predict(player_a: str, player_b: str, surface: str) -> dict:
         "elo_a":          elo["elo_a"],
         "elo_b":          elo["elo_b"],
         "elo_prob_a":     round(elo_prob_a, 4),
+        "strength_prob_a": round(strength_prob_a, 4),
         "form_prob_a":    round(form_prob_a, 4),
         "surface_prob_a": round(surf_prob_a, 4),
         "h2h_prob_a":     round(h2h_prob_a, 4),
@@ -127,6 +139,14 @@ def advanced_predict(player_a: str, player_b: str, surface: str) -> dict:
         "h2h_wins_b":     h2h_wins_b,
         "data_quality":   data_quality,
     }
+
+
+def _get_strength_probs(player_a: str, player_b: str, surface: str):
+    """Returns strength model output dict or None when unavailable."""
+    try:
+        return predict_strength_prob(player_a, player_b, surface)
+    except Exception:
+        return None
 
 
 def _get_form_scores(player_a: str, player_b: str):

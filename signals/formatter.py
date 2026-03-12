@@ -51,7 +51,16 @@ def format_signal(signal: dict) -> str:
     player_b   = _escape(signal["player_b"])
     bet_on     = _escape(signal["bet_on"])
 
+    ev_score = signal.get("ev_score", 0)
+    if ev_score >= 0.06:
+        tier_label = "🔥 *Strong Value Bet*"
+    elif ev_score >= 0.04:
+        tier_label = "⚡️ *Medium Value Bet*"
+    else:
+        tier_label = "📈 *Small Value Bet*"
+
     msg = (
+        f"{tier_label}\n"
         f"🎾 *TENNISEDGE SIGNAL*\n"
         f"━━━━━━━━━━━━━━━━━━━\n\n"
         f"🏆 *Tournament*\n"
@@ -64,10 +73,32 @@ def format_signal(signal: dict) -> str:
         f"💰 *Odds:* {signal['odds']}\n\n"
         f"📊 *Model Prob:* {model_pct}%\n"
         f"📉 *Market Prob:* {market_pct}%\n\n"
+    )
+
+    if signal.get("model_prob") is not None and (
+        signal["model_prob"] > 0.90 or signal["model_prob"] < 0.10
+    ):
+        msg += "⚠️ \\[Suspicious Model Probability\\]\n\n"
+
+    msg += (
         f"💎 *Value Edge:* +{value_edge_pct}%\n"
         f"🧠 *Confidence:* {confidence:.2f}x\n"
-        f"🔥 *True Edge Score: +{true_edge_pct}%*\n\n"
+        f"🔥 *True Edge Score: +{true_edge_pct}%*\n"
+        f"🎯 *EV Score: {ev_score:.3f}*\n\n"
     )
+
+    bet_fraction = signal.get("recommended_bet_fraction")
+    bet_size = signal.get("recommended_bet_size")
+    bankroll = signal.get("bankroll_assumed")
+    if bet_fraction is not None:
+        frac_pct = round(float(bet_fraction) * 100, 2)
+        if bet_size is not None and bankroll is not None:
+            msg += (
+                f"💰 *Half-Kelly Stake:* {frac_pct}% "
+                f"(≈ {round(float(bet_size), 2)} units on {round(float(bankroll), 2)} bankroll)\n\n"
+            )
+        else:
+            msg += f"💰 *Half-Kelly Stake:* {frac_pct}%\n\n"
 
     # Add 4-factor model breakdown if available
     if signal.get("data_quality") and signal["data_quality"] != "elo_only":

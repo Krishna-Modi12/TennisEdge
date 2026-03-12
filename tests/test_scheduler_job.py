@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import unittest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -16,7 +17,9 @@ class SchedulerJobTests(unittest.TestCase):
         fake_loop.is_running.return_value = True
         job._bot_loop = fake_loop
 
-        with patch("ingestion.resolve_matches.resolve_pending_signals", return_value={"ok": True}), patch.object(
+        with patch("ingestion.resolve_matches.resolve_pending_signals", return_value={"ok": True}), patch(
+            "signals.result_tracker.sync_signal_performance", return_value={"ok": True}
+        ), patch.object(
             job, "_trigger_daily_elo_update_if_due", return_value=None
         ), patch.object(
             job, "fetch_odds", return_value=[]
@@ -39,7 +42,9 @@ class SchedulerJobTests(unittest.TestCase):
         future = MagicMock()
         future.result.return_value = None
 
-        with patch("ingestion.resolve_matches.resolve_pending_signals", return_value={"ok": True}), patch.object(
+        with patch("ingestion.resolve_matches.resolve_pending_signals", return_value={"ok": True}), patch(
+            "signals.result_tracker.sync_signal_performance", return_value={"ok": True}
+        ), patch.object(
             job, "_trigger_daily_elo_update_if_due", return_value=None
         ), patch.object(
             job, "fetch_odds", return_value=[{"match_id": "1"}]
@@ -64,6 +69,7 @@ class SchedulerJobTests(unittest.TestCase):
         signal = {
             "signal_id": 101,
             "bet_on": "Alice",
+            "match_id": "m1",
             "player_a": "Alice",
             "player_b": "Bob",
             "surface": "hard",
@@ -79,6 +85,10 @@ class SchedulerJobTests(unittest.TestCase):
         ), patch("database.db.deduct_credit") as deduct_mock, patch(
             "database.db.record_delivery"
         ) as delivery_mock, patch(
+            "database.db.is_signal_alert_sent", return_value=False
+        ), patch(
+            "database.db.record_signal_alert"
+        ), patch(
             "signals.formatter.format_signal", return_value="msg"
         ), patch(
             "signals.formatter.format_signal_with_ai", return_value="msg+ai"
@@ -90,8 +100,83 @@ class SchedulerJobTests(unittest.TestCase):
         deduct_mock.assert_not_called()
         delivery_mock.assert_not_called()
 
+    def test_duplicate_alert_is_skipped_before_send(self):
+        signal = {
+            "signal_id": 777,
+            "match_id": "match_777",
+            "bet_on": "Alice",
+            "player_a": "Alice",
+            "player_b": "Bob",
+            "surface": "hard",
+            "model_prob": 0.6,
+            "odds": 2.0,
+            "value_edge": 0.05,
+        }
+        send_message = AsyncMock()
+        job._bot_app = SimpleNamespace(bot=SimpleNamespace(send_message=send_message))
+
+        with patch("database.db.is_signal_alert_sent", return_value=True), patch(
+            "database.db.get_all_subscribers", return_value=[12345]
+        ), patch("database.db.record_signal_alert") as record_alert_mock:
+            asyncio.run(job._send_signal_to_subscribers(signal))
+
+        send_message.assert_not_called()
+        record_alert_mock.assert_not_called()
+
+    def test_signal_hash_is_deterministic(self):
+        signal = {
+            "signal_id": 778,
+            "match_id": "match_778",
+            "market": "match_winner",
+            "bet_on": "Alice",
+            "player_a": "Alice",
+            "player_b": "Bob",
+            "surface": "hard",
+            "model_prob": 0.6,
+            "odds": 2.0,
+            "value_edge": 0.05,
+        }
+        expected_hash = hashlib.sha1(
+            "match_778:match_winner:alice".encode()
+        ).hexdigest()
+
+        send_message = AsyncMock()
+        job._bot_app = SimpleNamespace(bot=SimpleNamespace(send_message=send_message))
+
+        with patch("database.db.is_signal_alert_sent", return_value=True) as is_sent_mock:
+            asyncio.run(job._send_signal_to_subscribers(signal))
+
+        is_sent_mock.assert_called_once_with(expected_hash)
+
+    def test_signal_hash_normalizes_selection_spaces_and_case(self):
+        signal = {
+            "signal_id": 779,
+            "match_id": "match_779",
+            "market": "match_winner",
+            "bet_on": "  ALICE  ",
+            "player_a": "Alice",
+            "player_b": "Bob",
+            "surface": "hard",
+            "model_prob": 0.6,
+            "odds": 2.0,
+            "value_edge": 0.05,
+        }
+        expected_hash = hashlib.sha1(
+            "match_779:match_winner:alice".encode()
+        ).hexdigest()
+
+        send_message = AsyncMock()
+        job._bot_app = SimpleNamespace(bot=SimpleNamespace(send_message=send_message))
+
+        with patch("database.db.is_signal_alert_sent", return_value=True) as is_sent_mock:
+            asyncio.run(job._send_signal_to_subscribers(signal))
+
+        is_sent_mock.assert_called_once_with(expected_hash)
+
     def test_fetch_odds_exception_is_handled(self):
-        with patch("ingestion.resolve_matches.resolve_pending_signals", return_value={"ok": True}), patch.object(
+        with patch("ingestion.resolve_matches.resolve_pending_signals", return_value={"ok": True}), patch(
+            "signals.result_tracker.sync_signal_performance", return_value={"ok": True}
+        ), patch.object(
             job, "_trigger_daily_elo_update_if_due", return_value=None
         ), patch.object(
             job, "fetch_odds", side_effect=Exception("odds down")

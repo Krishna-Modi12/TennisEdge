@@ -19,7 +19,11 @@ import pandas as pd
 import requests
 
 from database.db import (
-    init_schema, upsert_player_stats, upsert_h2h, resolve_player_name
+    init_schema,
+    upsert_player_stats,
+    upsert_h2h,
+    upsert_player_surface_strength,
+    resolve_player_name,
 )
 
 
@@ -125,6 +129,14 @@ def build_stats(atp_from=2015, atp_to=2025, wta_from=2015, wta_to=2025,
                     s_wins = sum(1 for _, _, w in surface_matches if w)
                     s_wr = s_wins / s_total if s_total > 0 else 0.5
                     upsert_player_stats(player, surface, form_score, s_wr, s_total)
+                    serve_strength, return_strength = _proxy_surface_strength(s_wr)
+                    upsert_player_surface_strength(
+                        player=player,
+                        surface=surface,
+                        serve_strength=serve_strength,
+                        return_strength=return_strength,
+                        matches_counted=s_total,
+                    )
 
             player_count += 1
             if player_count % 200 == 0:
@@ -213,6 +225,14 @@ def _calc_form_score(recent_matches: list) -> float:
         weight_sum += weight
 
     return round(weighted_sum / weight_sum, 4) if weight_sum > 0 else 0.5
+
+
+def _proxy_surface_strength(surface_win_rate: float) -> tuple[float, float]:
+    """Conservative mapping from surface win rate to serve/return strengths."""
+    wr = max(0.0, min(1.0, float(surface_win_rate)))
+    serve_strength = max(0.45, min(0.80, 0.62 + ((wr - 0.5) * 0.30)))
+    return_strength = max(0.25, min(0.55, 0.38 + ((wr - 0.5) * 0.24)))
+    return serve_strength, return_strength
 
 
 if __name__ == "__main__":

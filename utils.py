@@ -16,17 +16,20 @@ def normalize_player_name(name: str) -> str:
     if not name:
         return ""
     name = name.strip()
+    name = name.replace("-", " ")
+    name = name.replace(",", " ")
     name = re.sub(r"\s+", " ", name)
+    
     # Don't title case if it's already in a standard format with dots
     if not re.match(r"^[A-Z]\.\s+[A-Z][a-z]+", name):
         name = name.title()
     
-    # Swap "Djokovic N." to "N. Djokovic"
-    match = re.match(r"^(.+?)\s+([A-Z])\.$", name)
+    # Swap "Djokovic N." or "Djokovic N" to "N. Djokovic"
+    match = re.match(r"^(.+?)\s+([A-Z])\.?$", name)
     if match:
         name = f"{match.group(2)}. {match.group(1)}"
         
-    return name
+    return name.strip()
 
 
 def extract_last_name(name: str) -> str:
