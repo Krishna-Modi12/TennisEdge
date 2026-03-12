@@ -1,0 +1,380 @@
+test	Run unit tests	﻿2026-03-12T13:59:30.7643929Z ##[group]Run python -m unittest discover -s tests -p "test_*.py" -v
+test	Run unit tests	2026-03-12T13:59:30.7644443Z [36;1mpython -m unittest discover -s tests -p "test_*.py" -v[0m
+test	Run unit tests	2026-03-12T13:59:30.7694182Z shell: /usr/bin/bash -e {0}
+test	Run unit tests	2026-03-12T13:59:30.7694426Z env:
+test	Run unit tests	2026-03-12T13:59:30.7694673Z   pythonLocation: /opt/hostedtoolcache/Python/3.10.20/x64
+test	Run unit tests	2026-03-12T13:59:30.7695103Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.10.20/x64/lib/pkgconfig
+test	Run unit tests	2026-03-12T13:59:30.7695547Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.10.20/x64
+test	Run unit tests	2026-03-12T13:59:30.7695911Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.10.20/x64
+test	Run unit tests	2026-03-12T13:59:30.7696279Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.10.20/x64
+test	Run unit tests	2026-03-12T13:59:30.7696650Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.10.20/x64/lib
+test	Run unit tests	2026-03-12T13:59:30.7696963Z   MOCK_MODE: true
+test	Run unit tests	2026-03-12T13:59:30.7697153Z   ALLOW_MOCK_ON_RENDER: true
+test	Run unit tests	2026-03-12T13:59:30.7697361Z   DB_PATH: :memory:
+test	Run unit tests	2026-03-12T13:59:30.7697870Z   DATABASE_URL: ***localhost:5432/postgres
+test	Run unit tests	2026-03-12T13:59:30.7698183Z   TELEGRAM_BOT_TOKEN: test_token_ci
+test	Run unit tests	2026-03-12T13:59:30.7698696Z   ODDS_API_KEY: test_key_ci
+test	Run unit tests	2026-03-12T13:59:30.7698924Z   ALLSPORTS_API_KEY: test_key_ci
+test	Run unit tests	2026-03-12T13:59:30.7699157Z   UPI_ID: test@upi
+test	Run unit tests	2026-03-12T13:59:30.7699336Z ##[endgroup]
+test	Run unit tests	2026-03-12T13:59:31.4005422Z 
+test	Run unit tests	2026-03-12T13:59:31.4006256Z [Backtest] Using Pinnacle de-vig implied probabilities + point-in-time Elo confirmation.
+test	Run unit tests	2026-03-12T13:59:31.4006897Z 
+test	Run unit tests	2026-03-12T13:59:31.4008259Z test_backtest_sorts_matches_before_prediction (test_backtest_engine.BacktestEngineRegressionTests) ... ok
+test	Run unit tests	2026-03-12T13:59:31.4020263Z Downloading ATP 2024... 2 matches
+test	Run unit tests	2026-03-12T13:59:31.4020708Z 
+test	Run unit tests	2026-03-12T13:59:31.4020910Z Total matches with odds: 2
+test	Run unit tests	2026-03-12T13:59:31.4021235Z 
+test	Run unit tests	2026-03-12T13:59:31.4021719Z [Backtest] Using Pinnacle de-vig implied probabilities + point-in-time Elo confirmation.
+test	Run unit tests	2026-03-12T13:59:31.4022457Z 
+test	Run unit tests	2026-03-12T13:59:31.4179495Z test_backtest_uses_pinnacle_probs_as_primary_model (test_backtest_engine.BacktestEngineRegressionTests) ... ok
+test	Run unit tests	2026-03-12T13:59:31.4180834Z test_missing_pinnacle_odds_rejected (test_calculator.TestCalculateSignalIntegration)
+test	Run unit tests	2026-03-12T13:59:31.4181677Z Match without Pinnacle odds must be rejected. ... ok
+test	Run unit tests	2026-03-12T13:59:31.4182901Z test_unknown_tournament_rejected (test_calculator.TestCalculateSignalIntegration)
+test	Run unit tests	2026-03-12T13:59:31.4183730Z Match with unknown tournament name must be rejected. ... ok
+test	Run unit tests	2026-03-12T13:59:31.4184509Z test_valid_signal_fires (test_calculator.TestCalculateSignalIntegration)
+test	Run unit tests	2026-03-12T13:59:31.4292942Z A well-formed match with good edge should fire a signal. ... [NameResolve] Fuzzy search error for 'Carlos Alcaraz': current transaction is aborted, commands ignored until end of transaction block
+test	Run unit tests	2026-03-12T13:59:31.4294355Z 
+test	Run unit tests	2026-03-12T13:59:31.4304352Z ERROR
+test	Run unit tests	2026-03-12T13:59:31.4304890Z test_ev_score_present_in_signal (test_calculator.TestEvScore)
+test	Run unit tests	2026-03-12T13:59:31.4323015Z ev_score must be present in fired signals. ... [NameResolve] Fuzzy search error for 'Carlos Alcaraz': current transaction is aborted, commands ignored until end of transaction block
+test	Run unit tests	2026-03-12T13:59:31.4324218Z 
+test	Run unit tests	2026-03-12T13:59:31.4327844Z ERROR
+test	Run unit tests	2026-03-12T13:59:31.4328272Z test_probability_source_present (test_calculator.TestEvScore)
+test	Run unit tests	2026-03-12T13:59:31.4345956Z probability_source must be 'pinnacle_devig'. ... [NameResolve] Fuzzy search error for 'Carlos Alcaraz': current transaction is aborted, commands ignored until end of transaction block
+test	Run unit tests	2026-03-12T13:59:31.4347308Z 
+test	Run unit tests	2026-03-12T13:59:31.4349737Z ERROR
+test	Run unit tests	2026-03-12T13:59:31.4350694Z test_future_match_rejected (test_calculator.TestMatchTimingWindow)
+test	Run unit tests	2026-03-12T13:59:31.4351570Z Match more than 24h away must be rejected. ... ok
+test	Run unit tests	2026-03-12T13:59:31.4352215Z test_imminent_match_allowed (test_calculator.TestMatchTimingWindow)
+test	Run unit tests	2026-03-12T13:59:31.4369852Z Match within 24h must pass timing check. ... [NameResolve] Fuzzy search error for 'Carlos Alcaraz': current transaction is aborted, commands ignored until end of transaction block
+test	Run unit tests	2026-03-12T13:59:31.4371453Z 
+test	Run unit tests	2026-03-12T13:59:31.4375312Z ERROR
+test	Run unit tests	2026-03-12T13:59:31.4375717Z test_iso_string_handled (test_calculator.TestMatchTimingWindow)
+test	Run unit tests	2026-03-12T13:59:31.4376381Z ISO strings should be parsed correctly. ... ok
+test	Run unit tests	2026-03-12T13:59:31.4376807Z test_no_match_time_fails_open (test_calculator.TestMatchTimingWindow)
+test	Run unit tests	2026-03-12T13:59:31.4395306Z Missing match time must not reject the signal. ... [NameResolve] Fuzzy search error for 'Carlos Alcaraz': current transaction is aborted, commands ignored until end of transaction block
+test	Run unit tests	2026-03-12T13:59:31.4396795Z 
+test	Run unit tests	2026-03-12T13:59:31.4400340Z ERROR
+test	Run unit tests	2026-03-12T13:59:31.4400880Z test_unix_timestamp_handled (test_calculator.TestMatchTimingWindow)
+test	Run unit tests	2026-03-12T13:59:31.4403353Z Unix timestamps should be parsed correctly. ... ok
+test	Run unit tests	2026-03-12T13:59:31.4404342Z test_extreme_odds_rejected (test_calculator.TestOddsSanityBounds)
+test	Run unit tests	2026-03-12T13:59:31.4405093Z Odds outside valid bounds must produce None signal. ... ok
+test	Run unit tests	2026-03-12T13:59:31.4406086Z test_odds_at_boundary_accepted (test_calculator.TestOddsSanityBounds)
+test	Run unit tests	2026-03-12T13:59:31.4406948Z Values at boundary should be accepted by safe_float. ... ok
+test	Run unit tests	2026-03-12T13:59:31.4407636Z test_high_margin_raises (test_calculator.TestPinnacleProb)
+test	Run unit tests	2026-03-12T13:59:31.4408800Z Margin > 1.15 is not Pinnacle — must raise. ... ok
+test	Run unit tests	2026-03-12T13:59:31.4409482Z test_impossible_margin_raises (test_calculator.TestPinnacleProb)
+test	Run unit tests	2026-03-12T13:59:31.4410334Z Margin < 1.0 is impossible — must raise. ... ok
+test	Run unit tests	2026-03-12T13:59:31.4410749Z test_invalid_odds_raises (test_calculator.TestPinnacleProb)
+test	Run unit tests	2026-03-12T13:59:31.4411181Z Odds <= 1.0 must raise. ... ok
+test	Run unit tests	2026-03-12T13:59:31.4411536Z test_normal_margin_accepted (test_calculator.TestPinnacleProb)
+test	Run unit tests	2026-03-12T13:59:31.4412074Z Normal Pinnacle margin (1.02–1.06) must pass. ... ok
+test	Run unit tests	2026-03-12T13:59:31.4412465Z test_prob_is_clamped (test_calculator.TestPinnacleProb)
+test	Run unit tests	2026-03-12T13:59:31.4412830Z Probability must be clamped between 0.001 and 0.999. ... ok
+test	Run unit tests	2026-03-12T13:59:31.4413369Z test_invalid_values (test_calculator.TestSafeFloat) ... ok
+test	Run unit tests	2026-03-12T13:59:31.4414078Z test_valid_numbers (test_calculator.TestSafeFloat) ... ok
+test	Run unit tests	2026-03-12T13:59:31.4414629Z test_rejection_counts_returned (test_calculator.TestScanSummary)
+test	Run unit tests	2026-03-12T13:59:31.4446028Z process_matches must return rejection counts dict. ... [NameResolve] Fuzzy search error for 'Carlos Alcaraz': current transaction is aborted, commands ignored until end of transaction block
+test	Run unit tests	2026-03-12T13:59:31.4447335Z 
+test	Run unit tests	2026-03-12T13:59:31.4450950Z ERROR
+test	Run unit tests	2026-03-12T13:59:31.4451423Z test_signal_rate_cap (test_calculator.TestSignalRateCap)
+test	Run unit tests	2026-03-12T13:59:31.4473782Z Never fire more than MAX_SIGNALS_PER_SCAN signals in one scan. ... ERROR
+test	Run unit tests	2026-03-12T13:59:31.4474672Z test_suspicious_odds_gap_rejected (test_calculator.TestSuspiciousOddsGap)
+test	Run unit tests	2026-03-12T13:59:31.4491208Z Extreme odds gap between player and opponent → rejected. ... [NameResolve] Fuzzy search error for 'Carlos Alcaraz': current transaction is aborted, commands ignored until end of transaction block
+test	Run unit tests	2026-03-12T13:59:31.4492544Z 
+test	Run unit tests	2026-03-12T13:59:31.4495442Z ERROR
+test	Run unit tests	2026-03-12T13:59:31.4495841Z test_allowed_tier_labels (test_calculator.TestTournamentFilter)
+test	Run unit tests	2026-03-12T13:59:31.4496434Z Known tier labels must pass. ... ok
+test	Run unit tests	2026-03-12T13:59:31.4496896Z test_blocked_tier_keywords (test_calculator.TestTournamentFilter)
+test	Run unit tests	2026-03-12T13:59:31.4497475Z ITF/Futures keywords must always be blocked. ... ok
+test	Run unit tests	2026-03-12T13:59:31.4498103Z test_case_insensitive_matching (test_calculator.TestTournamentFilter)
+test	Run unit tests	2026-03-12T13:59:31.4498990Z Tournament name matching must be case-insensitive. ... ok
+test	Run unit tests	2026-03-12T13:59:31.4499636Z test_city_name_with_lower_tier_prefix (test_calculator.TestTournamentFilter)
+test	Run unit tests	2026-03-12T13:59:31.4500344Z Blocked keyword before city name must still reject. ... ok
+test	Run unit tests	2026-03-12T13:59:31.4500797Z test_city_name_with_lower_tier_suffix (test_calculator.TestTournamentFilter)
+test	Run unit tests	2026-03-12T13:59:31.4501418Z Blocked keyword after city name must still reject. ... ok
+test	Run unit tests	2026-03-12T13:59:31.4502098Z test_grand_slams_allowed_without_tier (test_calculator.TestTournamentFilter) ... ok
+test	Run unit tests	2026-03-12T13:59:31.4503316Z test_major_tour_events_allowed_without_tier (test_calculator.TestTournamentFilter)
+test	Run unit tests	2026-03-12T13:59:31.4503979Z Major ATP/WTA city names must pass without a tier label. ... ok
+test	Run unit tests	2026-03-12T13:59:31.4504577Z test_masters_1000_allowed_without_tier (test_calculator.TestTournamentFilter)
+test	Run unit tests	2026-03-12T13:59:31.4505126Z ATP Masters 1000 city names must pass without a tier label. ... ok
+test	Run unit tests	2026-03-12T13:59:31.4505699Z test_tour_keyword_required_without_tier (test_calculator.TestTournamentFilter)
+test	Run unit tests	2026-03-12T13:59:31.4506359Z ATP/WTA keyword in name → allowed when no tier label. ... ok
+test	Run unit tests	2026-03-12T13:59:31.4506765Z test_unknown_tier_rejected (test_calculator.TestTournamentFilter)
+test	Run unit tests	2026-03-12T13:59:31.4507112Z Unknown tier labels must be rejected. ... ok
+test	Run unit tests	2026-03-12T13:59:31.4507446Z test_unnamed_itf_rejected (test_calculator.TestTournamentFilter)
+test	Run unit tests	2026-03-12T13:59:31.4507906Z Unknown tournament names without tour keywords must be rejected. ... ok
+test	Run unit tests	2026-03-12T13:59:31.4508364Z test_unnamed_low_tier_still_rejected (test_calculator.TestTournamentFilter)
+test	Run unit tests	2026-03-12T13:59:31.4509072Z Unnamed low-tier events must still be rejected after keyword expansion. ... ok
+test	Run unit tests	2026-03-12T13:59:31.4509547Z test_wta_1000_allowed_without_tier (test_calculator.TestTournamentFilter)
+test	Run unit tests	2026-03-12T13:59:31.4509952Z WTA 1000 city names must pass without a tier label. ... ok
+test	Run unit tests	2026-03-12T13:59:31.4510980Z test_calculate_clv_aggregates_global_and_surface_stats (test_clv_tracker.ClvTrackerTests) ... ok
+test	Run unit tests	2026-03-12T13:59:31.4516582Z test_db_unavailable_returns_no_data_summary (test_clv_tracker.ClvTrackerTests) ... ok
+test	Run unit tests	2026-03-12T13:59:31.4517292Z test_format_report_contains_core_sections (test_clv_tracker.ClvTrackerTests) ... ok
+test	Run unit tests	2026-03-12T13:59:31.4522607Z test_get_all_user_telegram_ids_returns_sorted_rows (test_database_helpers.DatabaseHelpersTests) ... ok
+test	Run unit tests	2026-03-12T13:59:31.4523590Z test_agrees_when_direction_matches_and_gap_small (test_elo_filter.EloFilterTests) ... ok
+test	Run unit tests	2026-03-12T13:59:31.4524421Z test_rejects_on_direction_conflict (test_elo_filter.EloFilterTests) ... ok
+test	Run unit tests	2026-03-12T13:59:31.4524986Z test_rejects_on_large_gap (test_elo_filter.EloFilterTests) ... ok
+test	Run unit tests	2026-03-12T13:59:31.4534147Z test_dry_run_counts_updates_without_writing (test_elo_updater.EloUpdaterTests) ... ok
+test	Run unit tests	2026-03-12T13:59:31.4535233Z test_dry_run_without_api_key_skips_cleanly (test_elo_updater.EloUpdaterTests) ... ok
+test	Run unit tests	2026-03-12T13:59:31.4543671Z test_duplicate_events_are_skipped (test_elo_updater.EloUpdaterTests) ... ok
+test	Run unit tests	2026-03-12T13:59:31.4544637Z test_rejects_today_or_future_date (test_elo_updater.EloUpdaterTests) ... ok
+test	Run unit tests	2026-03-12T13:59:31.4558336Z test_successful_update_writes_elo_and_history (test_elo_updater.EloUpdaterTests) ... ok
+test	Run unit tests	2026-03-12T13:59:31.4563273Z test_live_mode_with_api_key_uses_live_data (test_fetch_odds.FetchOddsRegressionTests) ... ok
+test	Run unit tests	2026-03-12T13:59:31.4567020Z test_live_mode_without_api_key_returns_empty_list (test_fetch_odds.FetchOddsRegressionTests) ... ok
+test	Run unit tests	2026-03-12T13:59:31.4573290Z test_live_odds_extracts_best_offer_and_pinnacle_odds (test_fetch_odds.FetchOddsRegressionTests) ... ok
+test	Run unit tests	2026-03-12T13:59:31.4585577Z test_live_odds_extracts_ps_prefixed_pinnacle_labels (test_fetch_odds.FetchOddsRegressionTests) ... ok
+test	Run unit tests	2026-03-12T13:59:31.4591274Z test_mock_mode_uses_mock_data_only (test_fetch_odds.FetchOddsRegressionTests) ... ok
+test	Run unit tests	2026-03-12T13:59:31.4601769Z test_status_db_failure (test_paper_trading_status.PaperTradingStatusTests) ... ok
+test	Run unit tests	2026-03-12T13:59:31.4610357Z test_status_happy_path (test_paper_trading_status.PaperTradingStatusTests) ... ok
+test	Run unit tests	2026-03-12T13:59:31.4632568Z test_finished_match_records_closing_odds (test_resolve_matches.ResolveMatchesRegressionTests) ... ok
+test	Run unit tests	2026-03-12T13:59:31.4638680Z test_fixtures_request_exception_returns_failure_summary (test_resolve_matches.ResolveMatchesRegressionTests) ... ok
+test	Run unit tests	2026-03-12T13:59:31.4640429Z test_runtime_missing_api_key_returns_failure_summary (test_resolve_matches.ResolveMatchesRegressionTests) ... ODDS_API_KEY not set. Skipping pending signal resolution.
+test	Run unit tests	2026-03-12T13:59:31.4642159Z ok
+test	Run unit tests	2026-03-12T13:59:31.4645035Z test_runtime_validation_does_not_exit_process (test_resolve_matches.ResolveMatchesRegressionTests) ... --force requires --outcome (WON, LOST, or VOID)
+test	Run unit tests	2026-03-12T13:59:31.4646190Z ok
+test	Run unit tests	2026-03-12T13:59:31.4657101Z test_unsuccessful_fixtures_response_returns_failure_summary (test_resolve_matches.ResolveMatchesRegressionTests) ... ok
+test	Run unit tests	2026-03-12T13:59:31.4672250Z test_empty_odds_response (test_scheduler_job.SchedulerJobTests) ... ok
+test	Run unit tests	2026-03-12T13:59:31.4682305Z test_fetch_odds_exception_is_handled (test_scheduler_job.SchedulerJobTests) ... ok
+test	Run unit tests	2026-03-12T13:59:31.4747348Z test_send_message_exception_does_not_deduct_credit (test_scheduler_job.SchedulerJobTests) ... ok
+test	Run unit tests	2026-03-12T13:59:31.4780026Z test_successful_signal_delivery (test_scheduler_job.SchedulerJobTests) ... ok
+test	Run unit tests	2026-03-12T13:59:31.4808972Z test_add_baseline_probabilities (test_step4b_baseline_probs.Step4bBaselineTests) ... ok
+test	Run unit tests	2026-03-12T13:59:31.4809990Z test_de_vig_probs (test_step4b_baseline_probs.Step4bBaselineTests) ... ok
+test	Run unit tests	2026-03-12T13:59:31.4817274Z test_generate_weekly_summary_includes_clv_and_accuracy (test_weekly_summary.WeeklySummaryTests) ... ok
+test	Run unit tests	2026-03-12T13:59:31.4818222Z 
+test	Run unit tests	2026-03-12T13:59:31.4818635Z ======================================================================
+test	Run unit tests	2026-03-12T13:59:31.4819424Z ERROR: test_valid_signal_fires (test_calculator.TestCalculateSignalIntegration)
+test	Run unit tests	2026-03-12T13:59:31.4820231Z A well-formed match with good edge should fire a signal.
+test	Run unit tests	2026-03-12T13:59:31.4820825Z ----------------------------------------------------------------------
+test	Run unit tests	2026-03-12T13:59:31.4821351Z Traceback (most recent call last):
+test	Run unit tests	2026-03-12T13:59:31.4829451Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/test_calculator.py", line 331, in test_valid_signal_fires
+test	Run unit tests	2026-03-12T13:59:31.4830385Z     result = calculate_signal(match)
+test	Run unit tests	2026-03-12T13:59:31.4831258Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../signals/calculator.py", line 308, in calculate_signal
+test	Run unit tests	2026-03-12T13:59:31.4832185Z     model_data = advanced_predict(player_a, player_b, surface)
+test	Run unit tests	2026-03-12T13:59:31.4833111Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../models/advanced_model.py", line 33, in advanced_predict
+test	Run unit tests	2026-03-12T13:59:31.4834416Z     elo = elo_predict(player_a, player_b, surface)
+test	Run unit tests	2026-03-12T13:59:31.4835188Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../models/elo_model.py", line 39, in predict
+test	Run unit tests	2026-03-12T13:59:31.4835954Z     elo_a = blended_rating(player_a, surface)
+test	Run unit tests	2026-03-12T13:59:31.4836755Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../models/elo_model.py", line 24, in blended_rating
+test	Run unit tests	2026-03-12T13:59:31.4837504Z     overall = get_elo(player, "overall")
+test	Run unit tests	2026-03-12T13:59:31.4838196Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../database/db.py", line 706, in get_elo
+test	Run unit tests	2026-03-12T13:59:31.4839119Z     player = resolve_player_name(player)
+test	Run unit tests	2026-03-12T13:59:31.4839943Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../database/db.py", line 671, in resolve_player_name
+test	Run unit tests	2026-03-12T13:59:31.4840692Z     record_unmatched_player(name)
+test	Run unit tests	2026-03-12T13:59:31.4841481Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../database/db.py", line 1015, in record_unmatched_player
+test	Run unit tests	2026-03-12T13:59:31.4842245Z     conn.execute(
+test	Run unit tests	2026-03-12T13:59:31.4842809Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../database/db.py", line 28, in execute
+test	Run unit tests	2026-03-12T13:59:31.4843486Z     cur.execute(sql, params)
+test	Run unit tests	2026-03-12T13:59:31.4844275Z psycopg2.errors.InFailedSqlTransaction: current transaction is aborted, commands ignored until end of transaction block
+test	Run unit tests	2026-03-12T13:59:31.4845016Z 
+test	Run unit tests	2026-03-12T13:59:31.4845025Z 
+test	Run unit tests	2026-03-12T13:59:31.4845180Z ======================================================================
+test	Run unit tests	2026-03-12T13:59:31.4845757Z ERROR: test_ev_score_present_in_signal (test_calculator.TestEvScore)
+test	Run unit tests	2026-03-12T13:59:31.4846289Z ev_score must be present in fired signals.
+test	Run unit tests	2026-03-12T13:59:31.4846756Z ----------------------------------------------------------------------
+test	Run unit tests	2026-03-12T13:59:31.4847477Z Traceback (most recent call last):
+test	Run unit tests	2026-03-12T13:59:31.4848316Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/test_calculator.py", line 293, in test_ev_score_present_in_signal
+test	Run unit tests	2026-03-12T13:59:31.4849358Z     result = calculate_signal(match)
+test	Run unit tests	2026-03-12T13:59:31.4850147Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../signals/calculator.py", line 308, in calculate_signal
+test	Run unit tests	2026-03-12T13:59:31.4850996Z     model_data = advanced_predict(player_a, player_b, surface)
+test	Run unit tests	2026-03-12T13:59:31.4851882Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../models/advanced_model.py", line 33, in advanced_predict
+test	Run unit tests	2026-03-12T13:59:31.4852671Z     elo = elo_predict(player_a, player_b, surface)
+test	Run unit tests	2026-03-12T13:59:31.4853421Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../models/elo_model.py", line 39, in predict
+test	Run unit tests	2026-03-12T13:59:31.4854132Z     elo_a = blended_rating(player_a, surface)
+test	Run unit tests	2026-03-12T13:59:31.4854864Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../models/elo_model.py", line 24, in blended_rating
+test	Run unit tests	2026-03-12T13:59:31.4855578Z     overall = get_elo(player, "overall")
+test	Run unit tests	2026-03-12T13:59:31.4856250Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../database/db.py", line 706, in get_elo
+test	Run unit tests	2026-03-12T13:59:31.4856893Z     player = resolve_player_name(player)
+test	Run unit tests	2026-03-12T13:59:31.4857627Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../database/db.py", line 671, in resolve_player_name
+test	Run unit tests	2026-03-12T13:59:31.4858325Z     record_unmatched_player(name)
+test	Run unit tests	2026-03-12T13:59:31.4859208Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../database/db.py", line 1015, in record_unmatched_player
+test	Run unit tests	2026-03-12T13:59:31.4859906Z     conn.execute(
+test	Run unit tests	2026-03-12T13:59:31.4860444Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../database/db.py", line 28, in execute
+test	Run unit tests	2026-03-12T13:59:31.4861068Z     cur.execute(sql, params)
+test	Run unit tests	2026-03-12T13:59:31.4861803Z psycopg2.errors.InFailedSqlTransaction: current transaction is aborted, commands ignored until end of transaction block
+test	Run unit tests	2026-03-12T13:59:31.4862512Z 
+test	Run unit tests	2026-03-12T13:59:31.4862519Z 
+test	Run unit tests	2026-03-12T13:59:31.4862664Z ======================================================================
+test	Run unit tests	2026-03-12T13:59:31.4863477Z ERROR: test_probability_source_present (test_calculator.TestEvScore)
+test	Run unit tests	2026-03-12T13:59:31.4864013Z probability_source must be 'pinnacle_devig'.
+test	Run unit tests	2026-03-12T13:59:31.4864468Z ----------------------------------------------------------------------
+test	Run unit tests	2026-03-12T13:59:31.4864910Z Traceback (most recent call last):
+test	Run unit tests	2026-03-12T13:59:31.4865689Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/test_calculator.py", line 304, in test_probability_source_present
+test	Run unit tests	2026-03-12T13:59:31.4866468Z     result = calculate_signal(match)
+test	Run unit tests	2026-03-12T13:59:31.4867179Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../signals/calculator.py", line 308, in calculate_signal
+test	Run unit tests	2026-03-12T13:59:31.4867998Z     model_data = advanced_predict(player_a, player_b, surface)
+test	Run unit tests	2026-03-12T13:59:31.4869048Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../models/advanced_model.py", line 33, in advanced_predict
+test	Run unit tests	2026-03-12T13:59:31.4869835Z     elo = elo_predict(player_a, player_b, surface)
+test	Run unit tests	2026-03-12T13:59:31.4870541Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../models/elo_model.py", line 39, in predict
+test	Run unit tests	2026-03-12T13:59:31.4871229Z     elo_a = blended_rating(player_a, surface)
+test	Run unit tests	2026-03-12T13:59:31.4871950Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../models/elo_model.py", line 24, in blended_rating
+test	Run unit tests	2026-03-12T13:59:31.4872664Z     overall = get_elo(player, "overall")
+test	Run unit tests	2026-03-12T13:59:31.4873306Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../database/db.py", line 706, in get_elo
+test	Run unit tests	2026-03-12T13:59:31.4873988Z     player = resolve_player_name(player)
+test	Run unit tests	2026-03-12T13:59:31.4874748Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../database/db.py", line 671, in resolve_player_name
+test	Run unit tests	2026-03-12T13:59:31.4875458Z     record_unmatched_player(name)
+test	Run unit tests	2026-03-12T13:59:31.4876173Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../database/db.py", line 1015, in record_unmatched_player
+test	Run unit tests	2026-03-12T13:59:31.4877097Z     conn.execute(
+test	Run unit tests	2026-03-12T13:59:31.4877645Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../database/db.py", line 28, in execute
+test	Run unit tests	2026-03-12T13:59:31.4878302Z     cur.execute(sql, params)
+test	Run unit tests	2026-03-12T13:59:31.4879192Z psycopg2.errors.InFailedSqlTransaction: current transaction is aborted, commands ignored until end of transaction block
+test	Run unit tests	2026-03-12T13:59:31.4879902Z 
+test	Run unit tests	2026-03-12T13:59:31.4879910Z 
+test	Run unit tests	2026-03-12T13:59:31.4880057Z ======================================================================
+test	Run unit tests	2026-03-12T13:59:31.4880635Z ERROR: test_imminent_match_allowed (test_calculator.TestMatchTimingWindow)
+test	Run unit tests	2026-03-12T13:59:31.4881205Z Match within 24h must pass timing check.
+test	Run unit tests	2026-03-12T13:59:31.4881653Z ----------------------------------------------------------------------
+test	Run unit tests	2026-03-12T13:59:31.4882215Z Traceback (most recent call last):
+test	Run unit tests	2026-03-12T13:59:31.4882981Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/test_calculator.py", line 243, in test_imminent_match_allowed
+test	Run unit tests	2026-03-12T13:59:31.4883756Z     signal = calculate_signal(match)
+test	Run unit tests	2026-03-12T13:59:31.4884551Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../signals/calculator.py", line 308, in calculate_signal
+test	Run unit tests	2026-03-12T13:59:31.4885375Z     model_data = advanced_predict(player_a, player_b, surface)
+test	Run unit tests	2026-03-12T13:59:31.4886201Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../models/advanced_model.py", line 33, in advanced_predict
+test	Run unit tests	2026-03-12T13:59:31.4886987Z     elo = elo_predict(player_a, player_b, surface)
+test	Run unit tests	2026-03-12T13:59:31.4887681Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../models/elo_model.py", line 39, in predict
+test	Run unit tests	2026-03-12T13:59:31.4888362Z     elo_a = blended_rating(player_a, surface)
+test	Run unit tests	2026-03-12T13:59:31.4889250Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../models/elo_model.py", line 24, in blended_rating
+test	Run unit tests	2026-03-12T13:59:31.4889948Z     overall = get_elo(player, "overall")
+test	Run unit tests	2026-03-12T13:59:31.4890596Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../database/db.py", line 706, in get_elo
+test	Run unit tests	2026-03-12T13:59:31.4891236Z     player = resolve_player_name(player)
+test	Run unit tests	2026-03-12T13:59:31.4891960Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../database/db.py", line 671, in resolve_player_name
+test	Run unit tests	2026-03-12T13:59:31.4892882Z     record_unmatched_player(name)
+test	Run unit tests	2026-03-12T13:59:31.4893593Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../database/db.py", line 1015, in record_unmatched_player
+test	Run unit tests	2026-03-12T13:59:31.4894304Z     conn.execute(
+test	Run unit tests	2026-03-12T13:59:31.4894855Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../database/db.py", line 28, in execute
+test	Run unit tests	2026-03-12T13:59:31.4895474Z     cur.execute(sql, params)
+test	Run unit tests	2026-03-12T13:59:31.4896209Z psycopg2.errors.InFailedSqlTransaction: current transaction is aborted, commands ignored until end of transaction block
+test	Run unit tests	2026-03-12T13:59:31.4896889Z 
+test	Run unit tests	2026-03-12T13:59:31.4896897Z 
+test	Run unit tests	2026-03-12T13:59:31.4897038Z ======================================================================
+test	Run unit tests	2026-03-12T13:59:31.4897618Z ERROR: test_no_match_time_fails_open (test_calculator.TestMatchTimingWindow)
+test	Run unit tests	2026-03-12T13:59:31.4898184Z Missing match time must not reject the signal.
+test	Run unit tests	2026-03-12T13:59:31.4898794Z ----------------------------------------------------------------------
+test	Run unit tests	2026-03-12T13:59:31.4899246Z Traceback (most recent call last):
+test	Run unit tests	2026-03-12T13:59:31.4900004Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/test_calculator.py", line 255, in test_no_match_time_fails_open
+test	Run unit tests	2026-03-12T13:59:31.4900772Z     result = calculate_signal(match)
+test	Run unit tests	2026-03-12T13:59:31.4901492Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../signals/calculator.py", line 308, in calculate_signal
+test	Run unit tests	2026-03-12T13:59:31.4902299Z     model_data = advanced_predict(player_a, player_b, surface)
+test	Run unit tests	2026-03-12T13:59:31.4903139Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../models/advanced_model.py", line 33, in advanced_predict
+test	Run unit tests	2026-03-12T13:59:31.4903892Z     elo = elo_predict(player_a, player_b, surface)
+test	Run unit tests	2026-03-12T13:59:31.4904774Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../models/elo_model.py", line 39, in predict
+test	Run unit tests	2026-03-12T13:59:31.4905468Z     elo_a = blended_rating(player_a, surface)
+test	Run unit tests	2026-03-12T13:59:31.4906201Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../models/elo_model.py", line 24, in blended_rating
+test	Run unit tests	2026-03-12T13:59:31.4906907Z     overall = get_elo(player, "overall")
+test	Run unit tests	2026-03-12T13:59:31.4907557Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../database/db.py", line 706, in get_elo
+test	Run unit tests	2026-03-12T13:59:31.4908237Z     player = resolve_player_name(player)
+test	Run unit tests	2026-03-12T13:59:31.4909130Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../database/db.py", line 671, in resolve_player_name
+test	Run unit tests	2026-03-12T13:59:31.4909830Z     record_unmatched_player(name)
+test	Run unit tests	2026-03-12T13:59:31.4910551Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../database/db.py", line 1015, in record_unmatched_player
+test	Run unit tests	2026-03-12T13:59:31.4911256Z     conn.execute(
+test	Run unit tests	2026-03-12T13:59:31.4911805Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../database/db.py", line 28, in execute
+test	Run unit tests	2026-03-12T13:59:31.4912452Z     cur.execute(sql, params)
+test	Run unit tests	2026-03-12T13:59:31.4913188Z psycopg2.errors.InFailedSqlTransaction: current transaction is aborted, commands ignored until end of transaction block
+test	Run unit tests	2026-03-12T13:59:31.4913888Z 
+test	Run unit tests	2026-03-12T13:59:31.4913895Z 
+test	Run unit tests	2026-03-12T13:59:31.4914038Z ======================================================================
+test	Run unit tests	2026-03-12T13:59:31.4914601Z ERROR: test_rejection_counts_returned (test_calculator.TestScanSummary)
+test	Run unit tests	2026-03-12T13:59:31.4915161Z process_matches must return rejection counts dict.
+test	Run unit tests	2026-03-12T13:59:31.4915669Z ----------------------------------------------------------------------
+test	Run unit tests	2026-03-12T13:59:31.4916124Z Traceback (most recent call last):
+test	Run unit tests	2026-03-12T13:59:31.4916895Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/test_calculator.py", line 315, in test_rejection_counts_returned
+test	Run unit tests	2026-03-12T13:59:31.4917702Z     _, rejection_counts = process_matches(matches)
+test	Run unit tests	2026-03-12T13:59:31.4943141Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../signals/calculator.py", line 434, in process_matches
+test	Run unit tests	2026-03-12T13:59:31.4943983Z     result = calculate_signal(match)
+test	Run unit tests	2026-03-12T13:59:31.4945074Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../signals/calculator.py", line 308, in calculate_signal
+test	Run unit tests	2026-03-12T13:59:31.4945903Z     model_data = advanced_predict(player_a, player_b, surface)
+test	Run unit tests	2026-03-12T13:59:31.4946775Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../models/advanced_model.py", line 33, in advanced_predict
+test	Run unit tests	2026-03-12T13:59:31.4947598Z     elo = elo_predict(player_a, player_b, surface)
+test	Run unit tests	2026-03-12T13:59:31.4948316Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../models/elo_model.py", line 39, in predict
+test	Run unit tests	2026-03-12T13:59:31.4949264Z     elo_a = blended_rating(player_a, surface)
+test	Run unit tests	2026-03-12T13:59:31.4949997Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../models/elo_model.py", line 24, in blended_rating
+test	Run unit tests	2026-03-12T13:59:31.4950703Z     overall = get_elo(player, "overall")
+test	Run unit tests	2026-03-12T13:59:31.4951604Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../database/db.py", line 706, in get_elo
+test	Run unit tests	2026-03-12T13:59:31.4952283Z     player = resolve_player_name(player)
+test	Run unit tests	2026-03-12T13:59:31.4953014Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../database/db.py", line 671, in resolve_player_name
+test	Run unit tests	2026-03-12T13:59:31.4953713Z     record_unmatched_player(name)
+test	Run unit tests	2026-03-12T13:59:31.4954442Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../database/db.py", line 1015, in record_unmatched_player
+test	Run unit tests	2026-03-12T13:59:31.4955166Z     conn.execute(
+test	Run unit tests	2026-03-12T13:59:31.4955736Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../database/db.py", line 28, in execute
+test	Run unit tests	2026-03-12T13:59:31.4956385Z     cur.execute(sql, params)
+test	Run unit tests	2026-03-12T13:59:31.4957128Z psycopg2.errors.InFailedSqlTransaction: current transaction is aborted, commands ignored until end of transaction block
+test	Run unit tests	2026-03-12T13:59:31.4957823Z 
+test	Run unit tests	2026-03-12T13:59:31.4957833Z 
+test	Run unit tests	2026-03-12T13:59:31.4958200Z ======================================================================
+test	Run unit tests	2026-03-12T13:59:31.4958908Z ERROR: test_signal_rate_cap (test_calculator.TestSignalRateCap)
+test	Run unit tests	2026-03-12T13:59:31.4959490Z Never fire more than MAX_SIGNALS_PER_SCAN signals in one scan.
+test	Run unit tests	2026-03-12T13:59:31.4960032Z ----------------------------------------------------------------------
+test	Run unit tests	2026-03-12T13:59:31.4960483Z Traceback (most recent call last):
+test	Run unit tests	2026-03-12T13:59:31.4961201Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/test_calculator.py", line 280, in test_signal_rate_cap
+test	Run unit tests	2026-03-12T13:59:31.4961946Z     signals, _ = process_matches(matches)
+test	Run unit tests	2026-03-12T13:59:31.4962670Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../signals/calculator.py", line 434, in process_matches
+test	Run unit tests	2026-03-12T13:59:31.4963374Z     result = calculate_signal(match)
+test	Run unit tests	2026-03-12T13:59:31.4964095Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../signals/calculator.py", line 279, in calculate_signal
+test	Run unit tests	2026-03-12T13:59:31.4964866Z     if match_id != "unknown" and signal_exists(match_id):
+test	Run unit tests	2026-03-12T13:59:31.4965626Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../database/db.py", line 376, in signal_exists
+test	Run unit tests	2026-03-12T13:59:31.4966445Z     cur = conn.execute("SELECT 1 FROM signals WHERE match_id = %s", (match_id,))
+test	Run unit tests	2026-03-12T13:59:31.4967258Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../database/db.py", line 28, in execute
+test	Run unit tests	2026-03-12T13:59:31.4967892Z     cur.execute(sql, params)
+test	Run unit tests	2026-03-12T13:59:31.4968781Z psycopg2.errors.InFailedSqlTransaction: current transaction is aborted, commands ignored until end of transaction block
+test	Run unit tests	2026-03-12T13:59:31.4969474Z 
+test	Run unit tests	2026-03-12T13:59:31.4969482Z 
+test	Run unit tests	2026-03-12T13:59:31.4969630Z ======================================================================
+test	Run unit tests	2026-03-12T13:59:31.4970221Z ERROR: test_suspicious_odds_gap_rejected (test_calculator.TestSuspiciousOddsGap)
+test	Run unit tests	2026-03-12T13:59:31.4971144Z Extreme odds gap between player and opponent → rejected.
+test	Run unit tests	2026-03-12T13:59:31.4971661Z ----------------------------------------------------------------------
+test	Run unit tests	2026-03-12T13:59:31.4972120Z Traceback (most recent call last):
+test	Run unit tests	2026-03-12T13:59:31.4972922Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/test_calculator.py", line 226, in test_suspicious_odds_gap_rejected
+test	Run unit tests	2026-03-12T13:59:31.4974020Z     self.assertIsNone(calculate_signal(match))
+test	Run unit tests	2026-03-12T13:59:31.4974775Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../signals/calculator.py", line 308, in calculate_signal
+test	Run unit tests	2026-03-12T13:59:31.4975568Z     model_data = advanced_predict(player_a, player_b, surface)
+test	Run unit tests	2026-03-12T13:59:31.4976378Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../models/advanced_model.py", line 33, in advanced_predict
+test	Run unit tests	2026-03-12T13:59:31.4977147Z     elo = elo_predict(player_a, player_b, surface)
+test	Run unit tests	2026-03-12T13:59:31.4977862Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../models/elo_model.py", line 39, in predict
+test	Run unit tests	2026-03-12T13:59:31.4978716Z     elo_a = blended_rating(player_a, surface)
+test	Run unit tests	2026-03-12T13:59:31.4979449Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../models/elo_model.py", line 24, in blended_rating
+test	Run unit tests	2026-03-12T13:59:31.4980160Z     overall = get_elo(player, "overall")
+test	Run unit tests	2026-03-12T13:59:31.4980802Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../database/db.py", line 706, in get_elo
+test	Run unit tests	2026-03-12T13:59:31.4981470Z     player = resolve_player_name(player)
+test	Run unit tests	2026-03-12T13:59:31.4982190Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../database/db.py", line 671, in resolve_player_name
+test	Run unit tests	2026-03-12T13:59:31.4982883Z     record_unmatched_player(name)
+test	Run unit tests	2026-03-12T13:59:31.4983599Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../database/db.py", line 1015, in record_unmatched_player
+test	Run unit tests	2026-03-12T13:59:31.4984353Z     conn.execute(
+test	Run unit tests	2026-03-12T13:59:31.4984911Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../database/db.py", line 28, in execute
+test	Run unit tests	2026-03-12T13:59:31.4985542Z     cur.execute(sql, params)
+test	Run unit tests	2026-03-12T13:59:31.4986265Z psycopg2.errors.InFailedSqlTransaction: current transaction is aborted, commands ignored until end of transaction block
+test	Run unit tests	2026-03-12T13:59:31.4987158Z 
+test	Run unit tests	2026-03-12T13:59:31.4987166Z 
+test	Run unit tests	2026-03-12T13:59:31.4987356Z ----------------------------------------------------------------------
+test	Run unit tests	2026-03-12T13:59:31.4987811Z Ran 68 tests in 0.083s
+test	Run unit tests	2026-03-12T13:59:31.4987992Z 
+test	Run unit tests	2026-03-12T13:59:31.4988091Z FAILED (errors=8)
+test	Run unit tests	2026-03-12T13:59:31.4988377Z Downloading ATP 2024... 1 matches
+test	Run unit tests	2026-03-12T13:59:31.4988777Z 
+test	Run unit tests	2026-03-12T13:59:31.4988891Z Total matches with odds: 1
+test	Run unit tests	2026-03-12T13:59:31.4989649Z [EloDaily] {'ok': True, 'date': '2024-01-01', 'fixtures_fetched': 1, 'finished_singles': 1, 'updated': 1, 'duplicates': 0, 'errors': 0, 'dry_run': True}
+test	Run unit tests	2026-03-12T13:59:31.4991096Z [EloDaily] {'ok': True, 'date': '2024-01-01', 'fixtures_fetched': 0, 'finished_singles': 0, 'updated': 0, 'duplicates': 0, 'errors': 0, 'dry_run': True, 'skipped_reason': 'ODDS_API_KEY not set'}
+test	Run unit tests	2026-03-12T13:59:31.4992573Z [EloDaily] {'ok': True, 'date': '2024-01-01', 'fixtures_fetched': 1, 'finished_singles': 1, 'updated': 0, 'duplicates': 1, 'errors': 0, 'dry_run': False}
+test	Run unit tests	2026-03-12T13:59:31.4993842Z [EloDaily] {'ok': True, 'date': '2024-01-01', 'fixtures_fetched': 1, 'finished_singles': 1, 'updated': 1, 'duplicates': 0, 'errors': 0, 'dry_run': False}
+test	Run unit tests	2026-03-12T13:59:31.4994841Z [fetch_odds] ODDS_API_KEY missing and MOCK_MODE=false. Returning no live matches.
+test	Run unit tests	2026-03-12T13:59:31.4995403Z [fetch_odds] Fetched 1 upcoming matches.
+test	Run unit tests	2026-03-12T13:59:31.4995789Z [fetch_odds] Fetched 1 upcoming matches.
+test	Run unit tests	2026-03-12T13:59:31.4996180Z Checking results for 1 pending signals...
+test	Run unit tests	2026-03-12T13:59:31.4996454Z 
+test	Run unit tests	2026-03-12T13:59:31.4996586Z Resolved this run : 1 signals
+test	Run unit tests	2026-03-12T13:59:31.4996890Z   WON             : 1
+test	Run unit tests	2026-03-12T13:59:31.4997151Z   LOST            : 0
+test	Run unit tests	2026-03-12T13:59:31.4997393Z   VOID            : 0
+test	Run unit tests	2026-03-12T13:59:31.4997659Z Still pending     : 0 signals
+test	Run unit tests	2026-03-12T13:59:31.4997865Z 
+test	Run unit tests	2026-03-12T13:59:31.4998002Z Checking results for 1 pending signals...
+test	Run unit tests	2026-03-12T13:59:31.4998595Z Error fetching fixtures for resolution: network down
+test	Run unit tests	2026-03-12T13:59:31.4999047Z Checking results for 1 pending signals...
+test	Run unit tests	2026-03-12T13:59:31.4999427Z API did not return success for Fixtures.
+test	Run unit tests	2026-03-12T13:59:31.4999987Z [Scheduler] Running pipeline...
+test	Run unit tests	2026-03-12T13:59:31.5000319Z [Scheduler] No new signals this run.
+test	Run unit tests	2026-03-12T13:59:31.5000669Z [Scheduler] Running pipeline...
+test	Run unit tests	2026-03-12T13:59:31.5000993Z [Scheduler] Odds fetch error: odds down
+test	Run unit tests	2026-03-12T13:59:31.5001439Z [Scheduler] Failed to send to 12345: telegram send failed
+test	Run unit tests	2026-03-12T13:59:31.5001897Z [Scheduler] Running pipeline...
+test	Run unit tests	2026-03-12T13:59:31.5628115Z ##[error]Process completed with exit code 1.

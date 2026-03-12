@@ -9,11 +9,11 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:15
+        image: postgres:14
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: postgres
+          POSTGRES_DB: tennisedge_test
         ports:
           - 5432:5432
         options: >-
@@ -21,6 +21,10 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/tennisedge_test
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,7 +32,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.10"
+          python-version: "3.11"
 
       - name: Install dependencies
         run: |
@@ -38,6 +42,9 @@ jobs:
       - name: Syntax check
         run: python -m compileall -q .
 
+      - name: Initialize DB
+        run: PGPASSWORD=postgres psql -U postgres -h localhost -d tennisedge_test -f database/schema.sql
+
       - name: Run unit tests
         run: python -m unittest discover -s tests -p "test_*.py" -v
         env:
@@ -45,7 +52,6 @@ jobs:
           MOCK_MODE: "true"
           ALLOW_MOCK_ON_RENDER: "true"
           DB_PATH: ":memory:"
-          DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/postgres"
           TELEGRAM_BOT_TOKEN: "test_token_ci"
           ODDS_API_KEY: "test_key_ci"
           ALLSPORTS_API_KEY: "test_key_ci"

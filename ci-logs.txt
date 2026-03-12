@@ -1,0 +1,392 @@
+test	Run unit tests	﻿2026-03-12T13:48:20.9812152Z ##[group]Run python -m unittest discover -s tests -p "test_*.py" -v
+test	Run unit tests	2026-03-12T13:48:20.9812673Z [36;1mpython -m unittest discover -s tests -p "test_*.py" -v[0m
+test	Run unit tests	2026-03-12T13:48:20.9864713Z shell: /usr/bin/bash -e {0}
+test	Run unit tests	2026-03-12T13:48:20.9864973Z env:
+test	Run unit tests	2026-03-12T13:48:20.9865227Z   pythonLocation: /opt/hostedtoolcache/Python/3.10.19/x64
+test	Run unit tests	2026-03-12T13:48:20.9865662Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.10.19/x64/lib/pkgconfig
+test	Run unit tests	2026-03-12T13:48:20.9866093Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.10.19/x64
+test	Run unit tests	2026-03-12T13:48:20.9866468Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.10.19/x64
+test	Run unit tests	2026-03-12T13:48:20.9866845Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.10.19/x64
+test	Run unit tests	2026-03-12T13:48:20.9867218Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.10.19/x64/lib
+test	Run unit tests	2026-03-12T13:48:20.9867537Z   MOCK_MODE: true
+test	Run unit tests	2026-03-12T13:48:20.9867732Z   ALLOW_MOCK_ON_RENDER: true
+test	Run unit tests	2026-03-12T13:48:20.9867944Z   DB_PATH: :memory:
+test	Run unit tests	2026-03-12T13:48:20.9868519Z   DATABASE_URL: ***localhost:5432/postgres
+test	Run unit tests	2026-03-12T13:48:20.9868861Z   TELEGRAM_BOT_TOKEN: test_token_ci
+test	Run unit tests	2026-03-12T13:48:20.9869110Z   ODDS_API_KEY: test_key_ci
+test	Run unit tests	2026-03-12T13:48:20.9869331Z   ALLSPORTS_API_KEY: test_key_ci
+test	Run unit tests	2026-03-12T13:48:20.9869569Z   UPI_ID: test@upi
+test	Run unit tests	2026-03-12T13:48:20.9869748Z ##[endgroup]
+test	Run unit tests	2026-03-12T13:48:22.8701599Z 
+test	Run unit tests	2026-03-12T13:48:22.8702545Z [Backtest] Using Pinnacle de-vig implied probabilities + point-in-time Elo confirmation.
+test	Run unit tests	2026-03-12T13:48:22.8703099Z 
+test	Run unit tests	2026-03-12T13:48:22.8704810Z test_backtest_sorts_matches_before_prediction (test_backtest_engine.BacktestEngineRegressionTests) ... ok
+test	Run unit tests	2026-03-12T13:48:22.8714743Z Downloading ATP 2024... 2 matches
+test	Run unit tests	2026-03-12T13:48:22.8715122Z 
+test	Run unit tests	2026-03-12T13:48:22.8715233Z Total matches with odds: 2
+test	Run unit tests	2026-03-12T13:48:22.8715409Z 
+test	Run unit tests	2026-03-12T13:48:22.8715714Z [Backtest] Using Pinnacle de-vig implied probabilities + point-in-time Elo confirmation.
+test	Run unit tests	2026-03-12T13:48:22.8716128Z 
+test	Run unit tests	2026-03-12T13:48:22.8871513Z test_backtest_uses_pinnacle_probs_as_primary_model (test_backtest_engine.BacktestEngineRegressionTests) ... ok
+test	Run unit tests	2026-03-12T13:48:22.8873473Z test_missing_pinnacle_odds_rejected (test_calculator.TestCalculateSignalIntegration)
+test	Run unit tests	2026-03-12T13:48:22.8875224Z Match without Pinnacle odds must be rejected. ... ok
+test	Run unit tests	2026-03-12T13:48:22.8876287Z test_unknown_tournament_rejected (test_calculator.TestCalculateSignalIntegration)
+test	Run unit tests	2026-03-12T13:48:22.8877405Z Match with unknown tournament name must be rejected. ... ok
+test	Run unit tests	2026-03-12T13:48:22.8878478Z test_valid_signal_fires (test_calculator.TestCalculateSignalIntegration)
+test	Run unit tests	2026-03-12T13:48:22.8891673Z A well-formed match with good edge should fire a signal. ... ERROR
+test	Run unit tests	2026-03-12T13:48:22.8892520Z test_ev_score_present_in_signal (test_calculator.TestEvScore)
+test	Run unit tests	2026-03-12T13:48:22.8896562Z ev_score must be present in fired signals. ... ERROR
+test	Run unit tests	2026-03-12T13:48:22.8897323Z test_probability_source_present (test_calculator.TestEvScore)
+test	Run unit tests	2026-03-12T13:48:22.8900837Z probability_source must be 'pinnacle_devig'. ... ERROR
+test	Run unit tests	2026-03-12T13:48:22.8901647Z test_future_match_rejected (test_calculator.TestMatchTimingWindow)
+test	Run unit tests	2026-03-12T13:48:22.8902435Z Match more than 24h away must be rejected. ... ok
+test	Run unit tests	2026-03-12T13:48:22.8903199Z test_imminent_match_allowed (test_calculator.TestMatchTimingWindow)
+test	Run unit tests	2026-03-12T13:48:22.8906928Z Match within 24h must pass timing check. ... ERROR
+test	Run unit tests	2026-03-12T13:48:22.8907747Z test_iso_string_handled (test_calculator.TestMatchTimingWindow)
+test	Run unit tests	2026-03-12T13:48:22.8908507Z ISO strings should be parsed correctly. ... ok
+test	Run unit tests	2026-03-12T13:48:22.8909229Z test_no_match_time_fails_open (test_calculator.TestMatchTimingWindow)
+test	Run unit tests	2026-03-12T13:48:22.8912200Z Missing match time must not reject the signal. ... ERROR
+test	Run unit tests	2026-03-12T13:48:22.8912891Z test_unix_timestamp_handled (test_calculator.TestMatchTimingWindow)
+test	Run unit tests	2026-03-12T13:48:22.8913556Z Unix timestamps should be parsed correctly. ... ok
+test	Run unit tests	2026-03-12T13:48:22.8914341Z test_extreme_odds_rejected (test_calculator.TestOddsSanityBounds)
+test	Run unit tests	2026-03-12T13:48:22.8915030Z Odds outside valid bounds must produce None signal. ... ok
+test	Run unit tests	2026-03-12T13:48:22.8916118Z test_odds_at_boundary_accepted (test_calculator.TestOddsSanityBounds)
+test	Run unit tests	2026-03-12T13:48:22.8916826Z Values at boundary should be accepted by safe_float. ... ok
+test	Run unit tests	2026-03-12T13:48:22.8917461Z test_high_margin_raises (test_calculator.TestPinnacleProb)
+test	Run unit tests	2026-03-12T13:48:22.8918339Z Margin > 1.15 is not Pinnacle — must raise. ... ok
+test	Run unit tests	2026-03-12T13:48:22.8918965Z test_impossible_margin_raises (test_calculator.TestPinnacleProb)
+test	Run unit tests	2026-03-12T13:48:22.8919896Z Margin < 1.0 is impossible — must raise. ... ok
+test	Run unit tests	2026-03-12T13:48:22.8920525Z test_invalid_odds_raises (test_calculator.TestPinnacleProb)
+test	Run unit tests	2026-03-12T13:48:22.8921063Z Odds <= 1.0 must raise. ... ok
+test	Run unit tests	2026-03-12T13:48:22.8921556Z test_normal_margin_accepted (test_calculator.TestPinnacleProb)
+test	Run unit tests	2026-03-12T13:48:22.8922265Z Normal Pinnacle margin (1.02–1.06) must pass. ... ok
+test	Run unit tests	2026-03-12T13:48:22.8922839Z test_prob_is_clamped (test_calculator.TestPinnacleProb)
+test	Run unit tests	2026-03-12T13:48:22.8923455Z Probability must be clamped between 0.001 and 0.999. ... ok
+test	Run unit tests	2026-03-12T13:48:22.8924083Z test_invalid_values (test_calculator.TestSafeFloat) ... ok
+test	Run unit tests	2026-03-12T13:48:22.8924793Z test_valid_numbers (test_calculator.TestSafeFloat) ... ok
+test	Run unit tests	2026-03-12T13:48:22.8925196Z test_rejection_counts_returned (test_calculator.TestScanSummary)
+test	Run unit tests	2026-03-12T13:48:22.8943996Z process_matches must return rejection counts dict. ... ERROR
+test	Run unit tests	2026-03-12T13:48:22.8944801Z test_signal_rate_cap (test_calculator.TestSignalRateCap)
+test	Run unit tests	2026-03-12T13:48:22.8961502Z Never fire more than MAX_SIGNALS_PER_SCAN signals in one scan. ... ERROR
+test	Run unit tests	2026-03-12T13:48:22.8962304Z test_suspicious_odds_gap_rejected (test_calculator.TestSuspiciousOddsGap)
+test	Run unit tests	2026-03-12T13:48:22.8966249Z Extreme odds gap between player and opponent → rejected. ... ERROR
+test	Run unit tests	2026-03-12T13:48:22.8966970Z test_allowed_tier_labels (test_calculator.TestTournamentFilter)
+test	Run unit tests	2026-03-12T13:48:22.8967549Z Known tier labels must pass. ... ok
+test	Run unit tests	2026-03-12T13:48:22.8968093Z test_blocked_tier_keywords (test_calculator.TestTournamentFilter)
+test	Run unit tests	2026-03-12T13:48:22.8968719Z ITF/Futures keywords must always be blocked. ... ok
+test	Run unit tests	2026-03-12T13:48:22.8969387Z test_case_insensitive_matching (test_calculator.TestTournamentFilter)
+test	Run unit tests	2026-03-12T13:48:22.8970322Z Tournament name matching must be case-insensitive. ... ok
+test	Run unit tests	2026-03-12T13:48:22.8971041Z test_city_name_with_lower_tier_prefix (test_calculator.TestTournamentFilter)
+test	Run unit tests	2026-03-12T13:48:22.8971764Z Blocked keyword before city name must still reject. ... ok
+test	Run unit tests	2026-03-12T13:48:22.8972477Z test_city_name_with_lower_tier_suffix (test_calculator.TestTournamentFilter)
+test	Run unit tests	2026-03-12T13:48:22.8973180Z Blocked keyword after city name must still reject. ... ok
+test	Run unit tests	2026-03-12T13:48:22.8973928Z test_grand_slams_allowed_without_tier (test_calculator.TestTournamentFilter) ... ok
+test	Run unit tests	2026-03-12T13:48:22.8975074Z test_major_tour_events_allowed_without_tier (test_calculator.TestTournamentFilter)
+test	Run unit tests	2026-03-12T13:48:22.8975856Z Major ATP/WTA city names must pass without a tier label. ... ok
+test	Run unit tests	2026-03-12T13:48:22.8976601Z test_masters_1000_allowed_without_tier (test_calculator.TestTournamentFilter)
+test	Run unit tests	2026-03-12T13:48:22.8977388Z ATP Masters 1000 city names must pass without a tier label. ... ok
+test	Run unit tests	2026-03-12T13:48:22.8978158Z test_tour_keyword_required_without_tier (test_calculator.TestTournamentFilter)
+test	Run unit tests	2026-03-12T13:48:22.8979034Z ATP/WTA keyword in name → allowed when no tier label. ... ok
+test	Run unit tests	2026-03-12T13:48:22.8979705Z test_unknown_tier_rejected (test_calculator.TestTournamentFilter)
+test	Run unit tests	2026-03-12T13:48:22.8980189Z Unknown tier labels must be rejected. ... ok
+test	Run unit tests	2026-03-12T13:48:22.8980543Z test_unnamed_itf_rejected (test_calculator.TestTournamentFilter)
+test	Run unit tests	2026-03-12T13:48:22.8980984Z Unknown tournament names without tour keywords must be rejected. ... ok
+test	Run unit tests	2026-03-12T13:48:22.8981457Z test_unnamed_low_tier_still_rejected (test_calculator.TestTournamentFilter)
+test	Run unit tests	2026-03-12T13:48:22.8981943Z Unnamed low-tier events must still be rejected after keyword expansion. ... ok
+test	Run unit tests	2026-03-12T13:48:22.8982423Z test_wta_1000_allowed_without_tier (test_calculator.TestTournamentFilter)
+test	Run unit tests	2026-03-12T13:48:22.8983022Z WTA 1000 city names must pass without a tier label. ... ok
+test	Run unit tests	2026-03-12T13:48:22.8984113Z test_calculate_clv_aggregates_global_and_surface_stats (test_clv_tracker.ClvTrackerTests) ... ok
+test	Run unit tests	2026-03-12T13:48:22.8989745Z test_db_unavailable_returns_no_data_summary (test_clv_tracker.ClvTrackerTests) ... ok
+test	Run unit tests	2026-03-12T13:48:22.8990699Z test_format_report_contains_core_sections (test_clv_tracker.ClvTrackerTests) ... ok
+test	Run unit tests	2026-03-12T13:48:22.8995742Z test_get_all_user_telegram_ids_returns_sorted_rows (test_database_helpers.DatabaseHelpersTests) ... ok
+test	Run unit tests	2026-03-12T13:48:22.8996799Z test_agrees_when_direction_matches_and_gap_small (test_elo_filter.EloFilterTests) ... ok
+test	Run unit tests	2026-03-12T13:48:22.8997671Z test_rejects_on_direction_conflict (test_elo_filter.EloFilterTests) ... ok
+test	Run unit tests	2026-03-12T13:48:22.8998419Z test_rejects_on_large_gap (test_elo_filter.EloFilterTests) ... ok
+test	Run unit tests	2026-03-12T13:48:22.9007612Z test_dry_run_counts_updates_without_writing (test_elo_updater.EloUpdaterTests) ... ok
+test	Run unit tests	2026-03-12T13:48:22.9008527Z test_dry_run_without_api_key_skips_cleanly (test_elo_updater.EloUpdaterTests) ... ok
+test	Run unit tests	2026-03-12T13:48:22.9016183Z test_duplicate_events_are_skipped (test_elo_updater.EloUpdaterTests) ... ok
+test	Run unit tests	2026-03-12T13:48:22.9017006Z test_rejects_today_or_future_date (test_elo_updater.EloUpdaterTests) ... ok
+test	Run unit tests	2026-03-12T13:48:22.9030107Z test_successful_update_writes_elo_and_history (test_elo_updater.EloUpdaterTests) ... ok
+test	Run unit tests	2026-03-12T13:48:22.9034481Z test_live_mode_with_api_key_uses_live_data (test_fetch_odds.FetchOddsRegressionTests) ... ok
+test	Run unit tests	2026-03-12T13:48:22.9037647Z test_live_mode_without_api_key_returns_empty_list (test_fetch_odds.FetchOddsRegressionTests) ... ok
+test	Run unit tests	2026-03-12T13:48:22.9042694Z test_live_odds_extracts_best_offer_and_pinnacle_odds (test_fetch_odds.FetchOddsRegressionTests) ... ok
+test	Run unit tests	2026-03-12T13:48:22.9054063Z test_live_odds_extracts_ps_prefixed_pinnacle_labels (test_fetch_odds.FetchOddsRegressionTests) ... ok
+test	Run unit tests	2026-03-12T13:48:22.9058712Z test_mock_mode_uses_mock_data_only (test_fetch_odds.FetchOddsRegressionTests) ... ok
+test	Run unit tests	2026-03-12T13:48:22.9064717Z test_status_db_failure (test_paper_trading_status.PaperTradingStatusTests) ... ok
+test	Run unit tests	2026-03-12T13:48:22.9072566Z test_status_happy_path (test_paper_trading_status.PaperTradingStatusTests) ... ok
+test	Run unit tests	2026-03-12T13:48:22.9094662Z test_finished_match_records_closing_odds (test_resolve_matches.ResolveMatchesRegressionTests) ... ok
+test	Run unit tests	2026-03-12T13:48:22.9099628Z test_fixtures_request_exception_returns_failure_summary (test_resolve_matches.ResolveMatchesRegressionTests) ... ok
+test	Run unit tests	2026-03-12T13:48:22.9101265Z test_runtime_missing_api_key_returns_failure_summary (test_resolve_matches.ResolveMatchesRegressionTests) ... ODDS_API_KEY not set. Skipping pending signal resolution.
+test	Run unit tests	2026-03-12T13:48:22.9102169Z ok
+test	Run unit tests	2026-03-12T13:48:22.9104769Z test_runtime_validation_does_not_exit_process (test_resolve_matches.ResolveMatchesRegressionTests) ... --force requires --outcome (WON, LOST, or VOID)
+test	Run unit tests	2026-03-12T13:48:22.9105651Z ok
+test	Run unit tests	2026-03-12T13:48:22.9114995Z test_unsuccessful_fixtures_response_returns_failure_summary (test_resolve_matches.ResolveMatchesRegressionTests) ... ok
+test	Run unit tests	2026-03-12T13:48:22.9129080Z test_empty_odds_response (test_scheduler_job.SchedulerJobTests) ... ok
+test	Run unit tests	2026-03-12T13:48:22.9137534Z test_fetch_odds_exception_is_handled (test_scheduler_job.SchedulerJobTests) ... ok
+test	Run unit tests	2026-03-12T13:48:22.9200818Z test_send_message_exception_does_not_deduct_credit (test_scheduler_job.SchedulerJobTests) ... ok
+test	Run unit tests	2026-03-12T13:48:22.9231734Z test_successful_signal_delivery (test_scheduler_job.SchedulerJobTests) ... ok
+test	Run unit tests	2026-03-12T13:48:22.9259535Z test_add_baseline_probabilities (test_step4b_baseline_probs.Step4bBaselineTests) ... ok
+test	Run unit tests	2026-03-12T13:48:22.9260678Z test_de_vig_probs (test_step4b_baseline_probs.Step4bBaselineTests) ... ok
+test	Run unit tests	2026-03-12T13:48:22.9266969Z test_generate_weekly_summary_includes_clv_and_accuracy (test_weekly_summary.WeeklySummaryTests) ... ok
+test	Run unit tests	2026-03-12T13:48:22.9267964Z 
+test	Run unit tests	2026-03-12T13:48:22.9268193Z ======================================================================
+test	Run unit tests	2026-03-12T13:48:22.9269069Z ERROR: test_valid_signal_fires (test_calculator.TestCalculateSignalIntegration)
+test	Run unit tests	2026-03-12T13:48:22.9270519Z A well-formed match with good edge should fire a signal.
+test	Run unit tests	2026-03-12T13:48:22.9271331Z ----------------------------------------------------------------------
+test	Run unit tests	2026-03-12T13:48:22.9272079Z Traceback (most recent call last):
+test	Run unit tests	2026-03-12T13:48:22.9280979Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/test_calculator.py", line 331, in test_valid_signal_fires
+test	Run unit tests	2026-03-12T13:48:22.9281592Z     result = calculate_signal(match)
+test	Run unit tests	2026-03-12T13:48:22.9282167Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../signals/calculator.py", line 308, in calculate_signal
+test	Run unit tests	2026-03-12T13:48:22.9282737Z     model_data = advanced_predict(player_a, player_b, surface)
+test	Run unit tests	2026-03-12T13:48:22.9283330Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../models/advanced_model.py", line 33, in advanced_predict
+test	Run unit tests	2026-03-12T13:48:22.9283874Z     elo = elo_predict(player_a, player_b, surface)
+test	Run unit tests	2026-03-12T13:48:22.9284667Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../models/elo_model.py", line 39, in predict
+test	Run unit tests	2026-03-12T13:48:22.9285165Z     elo_a = blended_rating(player_a, surface)
+test	Run unit tests	2026-03-12T13:48:22.9285704Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../models/elo_model.py", line 24, in blended_rating
+test	Run unit tests	2026-03-12T13:48:22.9286186Z     overall = get_elo(player, "overall")
+test	Run unit tests	2026-03-12T13:48:22.9286635Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../database/db.py", line 706, in get_elo
+test	Run unit tests	2026-03-12T13:48:22.9287089Z     player = resolve_player_name(player)
+test	Run unit tests	2026-03-12T13:48:22.9287582Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../database/db.py", line 554, in resolve_player_name
+test	Run unit tests	2026-03-12T13:48:22.9288054Z     conn = get_conn()
+test	Run unit tests	2026-03-12T13:48:22.9288444Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../database/db.py", line 61, in get_conn
+test	Run unit tests	2026-03-12T13:48:22.9288890Z     raw = psycopg2.connect(DATABASE_URL)
+test	Run unit tests	2026-03-12T13:48:22.9289441Z   File "/opt/hostedtoolcache/Python/3.10.19/x64/lib/python3.10/site-packages/psycopg2/__init__.py", line 122, in connect
+test	Run unit tests	2026-03-12T13:48:22.9290045Z     conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+test	Run unit tests	2026-03-12T13:48:22.9290927Z psycopg2.OperationalError: connection to server at "localhost" (::1), port 5432 failed: Connection refused
+test	Run unit tests	2026-03-12T13:48:22.9291507Z 	Is the server running on that host and accepting TCP/IP connections?
+test	Run unit tests	2026-03-12T13:48:22.9291976Z connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+test	Run unit tests	2026-03-12T13:48:22.9292449Z 	Is the server running on that host and accepting TCP/IP connections?
+test	Run unit tests	2026-03-12T13:48:22.9292705Z 
+test	Run unit tests	2026-03-12T13:48:22.9292711Z 
+test	Run unit tests	2026-03-12T13:48:22.9292814Z ======================================================================
+test	Run unit tests	2026-03-12T13:48:22.9293181Z ERROR: test_ev_score_present_in_signal (test_calculator.TestEvScore)
+test	Run unit tests	2026-03-12T13:48:22.9293542Z ev_score must be present in fired signals.
+test	Run unit tests	2026-03-12T13:48:22.9293849Z ----------------------------------------------------------------------
+test	Run unit tests	2026-03-12T13:48:22.9294168Z Traceback (most recent call last):
+test	Run unit tests	2026-03-12T13:48:22.9294998Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/test_calculator.py", line 293, in test_ev_score_present_in_signal
+test	Run unit tests	2026-03-12T13:48:22.9295557Z     result = calculate_signal(match)
+test	Run unit tests	2026-03-12T13:48:22.9296057Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../signals/calculator.py", line 308, in calculate_signal
+test	Run unit tests	2026-03-12T13:48:22.9296604Z     model_data = advanced_predict(player_a, player_b, surface)
+test	Run unit tests	2026-03-12T13:48:22.9297169Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../models/advanced_model.py", line 33, in advanced_predict
+test	Run unit tests	2026-03-12T13:48:22.9297685Z     elo = elo_predict(player_a, player_b, surface)
+test	Run unit tests	2026-03-12T13:48:22.9298161Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../models/elo_model.py", line 39, in predict
+test	Run unit tests	2026-03-12T13:48:22.9298620Z     elo_a = blended_rating(player_a, surface)
+test	Run unit tests	2026-03-12T13:48:22.9299119Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../models/elo_model.py", line 24, in blended_rating
+test	Run unit tests	2026-03-12T13:48:22.9299742Z     overall = get_elo(player, "overall")
+test	Run unit tests	2026-03-12T13:48:22.9300189Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../database/db.py", line 706, in get_elo
+test	Run unit tests	2026-03-12T13:48:22.9300616Z     player = resolve_player_name(player)
+test	Run unit tests	2026-03-12T13:48:22.9301099Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../database/db.py", line 554, in resolve_player_name
+test	Run unit tests	2026-03-12T13:48:22.9301557Z     conn = get_conn()
+test	Run unit tests	2026-03-12T13:48:22.9301934Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../database/db.py", line 61, in get_conn
+test	Run unit tests	2026-03-12T13:48:22.9302368Z     raw = psycopg2.connect(DATABASE_URL)
+test	Run unit tests	2026-03-12T13:48:22.9302882Z   File "/opt/hostedtoolcache/Python/3.10.19/x64/lib/python3.10/site-packages/psycopg2/__init__.py", line 122, in connect
+test	Run unit tests	2026-03-12T13:48:22.9303478Z     conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+test	Run unit tests	2026-03-12T13:48:22.9304042Z psycopg2.OperationalError: connection to server at "localhost" (::1), port 5432 failed: Connection refused
+test	Run unit tests	2026-03-12T13:48:22.9304846Z 	Is the server running on that host and accepting TCP/IP connections?
+test	Run unit tests	2026-03-12T13:48:22.9305320Z connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+test	Run unit tests	2026-03-12T13:48:22.9305777Z 	Is the server running on that host and accepting TCP/IP connections?
+test	Run unit tests	2026-03-12T13:48:22.9306036Z 
+test	Run unit tests	2026-03-12T13:48:22.9306041Z 
+test	Run unit tests	2026-03-12T13:48:22.9306142Z ======================================================================
+test	Run unit tests	2026-03-12T13:48:22.9306511Z ERROR: test_probability_source_present (test_calculator.TestEvScore)
+test	Run unit tests	2026-03-12T13:48:22.9306873Z probability_source must be 'pinnacle_devig'.
+test	Run unit tests	2026-03-12T13:48:22.9307189Z ----------------------------------------------------------------------
+test	Run unit tests	2026-03-12T13:48:22.9307492Z Traceback (most recent call last):
+test	Run unit tests	2026-03-12T13:48:22.9308032Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/test_calculator.py", line 304, in test_probability_source_present
+test	Run unit tests	2026-03-12T13:48:22.9308567Z     result = calculate_signal(match)
+test	Run unit tests	2026-03-12T13:48:22.9309042Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../signals/calculator.py", line 308, in calculate_signal
+test	Run unit tests	2026-03-12T13:48:22.9309747Z     model_data = advanced_predict(player_a, player_b, surface)
+test	Run unit tests	2026-03-12T13:48:22.9310312Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../models/advanced_model.py", line 33, in advanced_predict
+test	Run unit tests	2026-03-12T13:48:22.9310829Z     elo = elo_predict(player_a, player_b, surface)
+test	Run unit tests	2026-03-12T13:48:22.9311306Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../models/elo_model.py", line 39, in predict
+test	Run unit tests	2026-03-12T13:48:22.9311765Z     elo_a = blended_rating(player_a, surface)
+test	Run unit tests	2026-03-12T13:48:22.9312245Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../models/elo_model.py", line 24, in blended_rating
+test	Run unit tests	2026-03-12T13:48:22.9312709Z     overall = get_elo(player, "overall")
+test	Run unit tests	2026-03-12T13:48:22.9313131Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../database/db.py", line 706, in get_elo
+test	Run unit tests	2026-03-12T13:48:22.9313568Z     player = resolve_player_name(player)
+test	Run unit tests	2026-03-12T13:48:22.9314047Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../database/db.py", line 554, in resolve_player_name
+test	Run unit tests	2026-03-12T13:48:22.9314819Z     conn = get_conn()
+test	Run unit tests	2026-03-12T13:48:22.9315213Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../database/db.py", line 61, in get_conn
+test	Run unit tests	2026-03-12T13:48:22.9315643Z     raw = psycopg2.connect(DATABASE_URL)
+test	Run unit tests	2026-03-12T13:48:22.9316161Z   File "/opt/hostedtoolcache/Python/3.10.19/x64/lib/python3.10/site-packages/psycopg2/__init__.py", line 122, in connect
+test	Run unit tests	2026-03-12T13:48:22.9316764Z     conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+test	Run unit tests	2026-03-12T13:48:22.9317315Z psycopg2.OperationalError: connection to server at "localhost" (::1), port 5432 failed: Connection refused
+test	Run unit tests	2026-03-12T13:48:22.9317858Z 	Is the server running on that host and accepting TCP/IP connections?
+test	Run unit tests	2026-03-12T13:48:22.9318323Z connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+test	Run unit tests	2026-03-12T13:48:22.9318923Z 	Is the server running on that host and accepting TCP/IP connections?
+test	Run unit tests	2026-03-12T13:48:22.9319182Z 
+test	Run unit tests	2026-03-12T13:48:22.9319187Z 
+test	Run unit tests	2026-03-12T13:48:22.9319285Z ======================================================================
+test	Run unit tests	2026-03-12T13:48:22.9319724Z ERROR: test_imminent_match_allowed (test_calculator.TestMatchTimingWindow)
+test	Run unit tests	2026-03-12T13:48:22.9320101Z Match within 24h must pass timing check.
+test	Run unit tests	2026-03-12T13:48:22.9320393Z ----------------------------------------------------------------------
+test	Run unit tests	2026-03-12T13:48:22.9320698Z Traceback (most recent call last):
+test	Run unit tests	2026-03-12T13:48:22.9321207Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/test_calculator.py", line 243, in test_imminent_match_allowed
+test	Run unit tests	2026-03-12T13:48:22.9321718Z     signal = calculate_signal(match)
+test	Run unit tests	2026-03-12T13:48:22.9322205Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../signals/calculator.py", line 308, in calculate_signal
+test	Run unit tests	2026-03-12T13:48:22.9322749Z     model_data = advanced_predict(player_a, player_b, surface)
+test	Run unit tests	2026-03-12T13:48:22.9323313Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../models/advanced_model.py", line 33, in advanced_predict
+test	Run unit tests	2026-03-12T13:48:22.9323834Z     elo = elo_predict(player_a, player_b, surface)
+test	Run unit tests	2026-03-12T13:48:22.9324454Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../models/elo_model.py", line 39, in predict
+test	Run unit tests	2026-03-12T13:48:22.9324915Z     elo_a = blended_rating(player_a, surface)
+test	Run unit tests	2026-03-12T13:48:22.9325476Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../models/elo_model.py", line 24, in blended_rating
+test	Run unit tests	2026-03-12T13:48:22.9326135Z     overall = get_elo(player, "overall")
+test	Run unit tests	2026-03-12T13:48:22.9326583Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../database/db.py", line 706, in get_elo
+test	Run unit tests	2026-03-12T13:48:22.9327015Z     player = resolve_player_name(player)
+test	Run unit tests	2026-03-12T13:48:22.9327492Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../database/db.py", line 554, in resolve_player_name
+test	Run unit tests	2026-03-12T13:48:22.9327959Z     conn = get_conn()
+test	Run unit tests	2026-03-12T13:48:22.9328335Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../database/db.py", line 61, in get_conn
+test	Run unit tests	2026-03-12T13:48:22.9328926Z     raw = psycopg2.connect(DATABASE_URL)
+test	Run unit tests	2026-03-12T13:48:22.9329442Z   File "/opt/hostedtoolcache/Python/3.10.19/x64/lib/python3.10/site-packages/psycopg2/__init__.py", line 122, in connect
+test	Run unit tests	2026-03-12T13:48:22.9330053Z     conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+test	Run unit tests	2026-03-12T13:48:22.9330614Z psycopg2.OperationalError: connection to server at "localhost" (::1), port 5432 failed: Connection refused
+test	Run unit tests	2026-03-12T13:48:22.9331154Z 	Is the server running on that host and accepting TCP/IP connections?
+test	Run unit tests	2026-03-12T13:48:22.9331619Z connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+test	Run unit tests	2026-03-12T13:48:22.9332086Z 	Is the server running on that host and accepting TCP/IP connections?
+test	Run unit tests	2026-03-12T13:48:22.9332336Z 
+test	Run unit tests	2026-03-12T13:48:22.9332347Z 
+test	Run unit tests	2026-03-12T13:48:22.9332446Z ======================================================================
+test	Run unit tests	2026-03-12T13:48:22.9332840Z ERROR: test_no_match_time_fails_open (test_calculator.TestMatchTimingWindow)
+test	Run unit tests	2026-03-12T13:48:22.9333236Z Missing match time must not reject the signal.
+test	Run unit tests	2026-03-12T13:48:22.9333552Z ----------------------------------------------------------------------
+test	Run unit tests	2026-03-12T13:48:22.9333864Z Traceback (most recent call last):
+test	Run unit tests	2026-03-12T13:48:22.9334520Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/test_calculator.py", line 255, in test_no_match_time_fails_open
+test	Run unit tests	2026-03-12T13:48:22.9335043Z     result = calculate_signal(match)
+test	Run unit tests	2026-03-12T13:48:22.9335524Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../signals/calculator.py", line 308, in calculate_signal
+test	Run unit tests	2026-03-12T13:48:22.9336063Z     model_data = advanced_predict(player_a, player_b, surface)
+test	Run unit tests	2026-03-12T13:48:22.9336848Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../models/advanced_model.py", line 33, in advanced_predict
+test	Run unit tests	2026-03-12T13:48:22.9337521Z     elo = elo_predict(player_a, player_b, surface)
+test	Run unit tests	2026-03-12T13:48:22.9338050Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../models/elo_model.py", line 39, in predict
+test	Run unit tests	2026-03-12T13:48:22.9338507Z     elo_a = blended_rating(player_a, surface)
+test	Run unit tests	2026-03-12T13:48:22.9338994Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../models/elo_model.py", line 24, in blended_rating
+test	Run unit tests	2026-03-12T13:48:22.9339453Z     overall = get_elo(player, "overall")
+test	Run unit tests	2026-03-12T13:48:22.9339896Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../database/db.py", line 706, in get_elo
+test	Run unit tests	2026-03-12T13:48:22.9340327Z     player = resolve_player_name(player)
+test	Run unit tests	2026-03-12T13:48:22.9340802Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../database/db.py", line 554, in resolve_player_name
+test	Run unit tests	2026-03-12T13:48:22.9341255Z     conn = get_conn()
+test	Run unit tests	2026-03-12T13:48:22.9341640Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../database/db.py", line 61, in get_conn
+test	Run unit tests	2026-03-12T13:48:22.9342075Z     raw = psycopg2.connect(DATABASE_URL)
+test	Run unit tests	2026-03-12T13:48:22.9342616Z   File "/opt/hostedtoolcache/Python/3.10.19/x64/lib/python3.10/site-packages/psycopg2/__init__.py", line 122, in connect
+test	Run unit tests	2026-03-12T13:48:22.9343221Z     conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+test	Run unit tests	2026-03-12T13:48:22.9343784Z psycopg2.OperationalError: connection to server at "localhost" (::1), port 5432 failed: Connection refused
+test	Run unit tests	2026-03-12T13:48:22.9344501Z 	Is the server running on that host and accepting TCP/IP connections?
+test	Run unit tests	2026-03-12T13:48:22.9344961Z connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+test	Run unit tests	2026-03-12T13:48:22.9345422Z 	Is the server running on that host and accepting TCP/IP connections?
+test	Run unit tests	2026-03-12T13:48:22.9345675Z 
+test	Run unit tests	2026-03-12T13:48:22.9345680Z 
+test	Run unit tests	2026-03-12T13:48:22.9345780Z ======================================================================
+test	Run unit tests	2026-03-12T13:48:22.9346162Z ERROR: test_rejection_counts_returned (test_calculator.TestScanSummary)
+test	Run unit tests	2026-03-12T13:48:22.9346564Z process_matches must return rejection counts dict.
+test	Run unit tests	2026-03-12T13:48:22.9346895Z ----------------------------------------------------------------------
+test	Run unit tests	2026-03-12T13:48:22.9347340Z Traceback (most recent call last):
+test	Run unit tests	2026-03-12T13:48:22.9347877Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/test_calculator.py", line 315, in test_rejection_counts_returned
+test	Run unit tests	2026-03-12T13:48:22.9348429Z     _, rejection_counts = process_matches(matches)
+test	Run unit tests	2026-03-12T13:48:22.9348957Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../signals/calculator.py", line 434, in process_matches
+test	Run unit tests	2026-03-12T13:48:22.9349438Z     result = calculate_signal(match)
+test	Run unit tests	2026-03-12T13:48:22.9349928Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../signals/calculator.py", line 308, in calculate_signal
+test	Run unit tests	2026-03-12T13:48:22.9350474Z     model_data = advanced_predict(player_a, player_b, surface)
+test	Run unit tests	2026-03-12T13:48:22.9351026Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../models/advanced_model.py", line 33, in advanced_predict
+test	Run unit tests	2026-03-12T13:48:22.9351543Z     elo = elo_predict(player_a, player_b, surface)
+test	Run unit tests	2026-03-12T13:48:22.9352019Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../models/elo_model.py", line 39, in predict
+test	Run unit tests	2026-03-12T13:48:22.9352476Z     elo_a = blended_rating(player_a, surface)
+test	Run unit tests	2026-03-12T13:48:22.9352962Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../models/elo_model.py", line 24, in blended_rating
+test	Run unit tests	2026-03-12T13:48:22.9353424Z     overall = get_elo(player, "overall")
+test	Run unit tests	2026-03-12T13:48:22.9353866Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../database/db.py", line 706, in get_elo
+test	Run unit tests	2026-03-12T13:48:22.9354419Z     player = resolve_player_name(player)
+test	Run unit tests	2026-03-12T13:48:22.9354915Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../database/db.py", line 554, in resolve_player_name
+test	Run unit tests	2026-03-12T13:48:22.9355379Z     conn = get_conn()
+test	Run unit tests	2026-03-12T13:48:22.9355766Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../database/db.py", line 61, in get_conn
+test	Run unit tests	2026-03-12T13:48:22.9356332Z     raw = psycopg2.connect(DATABASE_URL)
+test	Run unit tests	2026-03-12T13:48:22.9356859Z   File "/opt/hostedtoolcache/Python/3.10.19/x64/lib/python3.10/site-packages/psycopg2/__init__.py", line 122, in connect
+test	Run unit tests	2026-03-12T13:48:22.9357454Z     conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+test	Run unit tests	2026-03-12T13:48:22.9358014Z psycopg2.OperationalError: connection to server at "localhost" (::1), port 5432 failed: Connection refused
+test	Run unit tests	2026-03-12T13:48:22.9358570Z 	Is the server running on that host and accepting TCP/IP connections?
+test	Run unit tests	2026-03-12T13:48:22.9359028Z connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+test	Run unit tests	2026-03-12T13:48:22.9359498Z 	Is the server running on that host and accepting TCP/IP connections?
+test	Run unit tests	2026-03-12T13:48:22.9359758Z 
+test	Run unit tests	2026-03-12T13:48:22.9359763Z 
+test	Run unit tests	2026-03-12T13:48:22.9359873Z ======================================================================
+test	Run unit tests	2026-03-12T13:48:22.9360225Z ERROR: test_signal_rate_cap (test_calculator.TestSignalRateCap)
+test	Run unit tests	2026-03-12T13:48:22.9360631Z Never fire more than MAX_SIGNALS_PER_SCAN signals in one scan.
+test	Run unit tests	2026-03-12T13:48:22.9360986Z ----------------------------------------------------------------------
+test	Run unit tests	2026-03-12T13:48:22.9361298Z Traceback (most recent call last):
+test	Run unit tests	2026-03-12T13:48:22.9361781Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/test_calculator.py", line 280, in test_signal_rate_cap
+test	Run unit tests	2026-03-12T13:48:22.9362269Z     signals, _ = process_matches(matches)
+test	Run unit tests	2026-03-12T13:48:22.9362761Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../signals/calculator.py", line 434, in process_matches
+test	Run unit tests	2026-03-12T13:48:22.9363239Z     result = calculate_signal(match)
+test	Run unit tests	2026-03-12T13:48:22.9363725Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../signals/calculator.py", line 279, in calculate_signal
+test	Run unit tests	2026-03-12T13:48:22.9364394Z     if match_id != "unknown" and signal_exists(match_id):
+test	Run unit tests	2026-03-12T13:48:22.9364895Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../database/db.py", line 374, in signal_exists
+test	Run unit tests	2026-03-12T13:48:22.9365341Z     conn = get_conn()
+test	Run unit tests	2026-03-12T13:48:22.9365727Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../database/db.py", line 61, in get_conn
+test	Run unit tests	2026-03-12T13:48:22.9366571Z     raw = psycopg2.connect(DATABASE_URL)
+test	Run unit tests	2026-03-12T13:48:22.9367272Z   File "/opt/hostedtoolcache/Python/3.10.19/x64/lib/python3.10/site-packages/psycopg2/__init__.py", line 122, in connect
+test	Run unit tests	2026-03-12T13:48:22.9367864Z     conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+test	Run unit tests	2026-03-12T13:48:22.9368430Z psycopg2.OperationalError: connection to server at "localhost" (::1), port 5432 failed: Connection refused
+test	Run unit tests	2026-03-12T13:48:22.9368981Z 	Is the server running on that host and accepting TCP/IP connections?
+test	Run unit tests	2026-03-12T13:48:22.9369444Z connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+test	Run unit tests	2026-03-12T13:48:22.9369908Z 	Is the server running on that host and accepting TCP/IP connections?
+test	Run unit tests	2026-03-12T13:48:22.9370159Z 
+test	Run unit tests	2026-03-12T13:48:22.9370164Z 
+test	Run unit tests	2026-03-12T13:48:22.9370270Z ======================================================================
+test	Run unit tests	2026-03-12T13:48:22.9370688Z ERROR: test_suspicious_odds_gap_rejected (test_calculator.TestSuspiciousOddsGap)
+test	Run unit tests	2026-03-12T13:48:22.9371409Z Extreme odds gap between player and opponent → rejected.
+test	Run unit tests	2026-03-12T13:48:22.9371762Z ----------------------------------------------------------------------
+test	Run unit tests	2026-03-12T13:48:22.9372077Z Traceback (most recent call last):
+test	Run unit tests	2026-03-12T13:48:22.9372621Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/test_calculator.py", line 226, in test_suspicious_odds_gap_rejected
+test	Run unit tests	2026-03-12T13:48:22.9373176Z     self.assertIsNone(calculate_signal(match))
+test	Run unit tests	2026-03-12T13:48:22.9373696Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../signals/calculator.py", line 308, in calculate_signal
+test	Run unit tests	2026-03-12T13:48:22.9374369Z     model_data = advanced_predict(player_a, player_b, surface)
+test	Run unit tests	2026-03-12T13:48:22.9374946Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../models/advanced_model.py", line 33, in advanced_predict
+test	Run unit tests	2026-03-12T13:48:22.9375636Z     elo = elo_predict(player_a, player_b, surface)
+test	Run unit tests	2026-03-12T13:48:22.9376115Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../models/elo_model.py", line 39, in predict
+test	Run unit tests	2026-03-12T13:48:22.9376579Z     elo_a = blended_rating(player_a, surface)
+test	Run unit tests	2026-03-12T13:48:22.9377056Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../models/elo_model.py", line 24, in blended_rating
+test	Run unit tests	2026-03-12T13:48:22.9377526Z     overall = get_elo(player, "overall")
+test	Run unit tests	2026-03-12T13:48:22.9377965Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../database/db.py", line 706, in get_elo
+test	Run unit tests	2026-03-12T13:48:22.9378397Z     player = resolve_player_name(player)
+test	Run unit tests	2026-03-12T13:48:22.9378884Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../database/db.py", line 554, in resolve_player_name
+test	Run unit tests	2026-03-12T13:48:22.9379346Z     conn = get_conn()
+test	Run unit tests	2026-03-12T13:48:22.9379722Z   File "/home/runner/work/TennisEdge/TennisEdge/tests/../database/db.py", line 61, in get_conn
+test	Run unit tests	2026-03-12T13:48:22.9380164Z     raw = psycopg2.connect(DATABASE_URL)
+test	Run unit tests	2026-03-12T13:48:22.9380686Z   File "/opt/hostedtoolcache/Python/3.10.19/x64/lib/python3.10/site-packages/psycopg2/__init__.py", line 122, in connect
+test	Run unit tests	2026-03-12T13:48:22.9381284Z     conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+test	Run unit tests	2026-03-12T13:48:22.9381844Z psycopg2.OperationalError: connection to server at "localhost" (::1), port 5432 failed: Connection refused
+test	Run unit tests	2026-03-12T13:48:22.9382387Z 	Is the server running on that host and accepting TCP/IP connections?
+test	Run unit tests	2026-03-12T13:48:22.9382856Z connection to server at "localhost" (127.0.0.1), port 5432 failed: Connection refused
+test	Run unit tests	2026-03-12T13:48:22.9383325Z 	Is the server running on that host and accepting TCP/IP connections?
+test	Run unit tests	2026-03-12T13:48:22.9383579Z 
+test	Run unit tests	2026-03-12T13:48:22.9383584Z 
+test	Run unit tests	2026-03-12T13:48:22.9383717Z ----------------------------------------------------------------------
+test	Run unit tests	2026-03-12T13:48:22.9384015Z Ran 68 tests in 0.058s
+test	Run unit tests	2026-03-12T13:48:22.9384139Z 
+test	Run unit tests	2026-03-12T13:48:22.9384325Z FAILED (errors=8)
+test	Run unit tests	2026-03-12T13:48:22.9384551Z Downloading ATP 2024... 1 matches
+test	Run unit tests	2026-03-12T13:48:22.9384703Z 
+test	Run unit tests	2026-03-12T13:48:22.9384791Z Total matches with odds: 1
+test	Run unit tests	2026-03-12T13:48:22.9385434Z [EloDaily] {'ok': True, 'date': '2024-01-01', 'fixtures_fetched': 1, 'finished_singles': 1, 'updated': 1, 'duplicates': 0, 'errors': 0, 'dry_run': True}
+test	Run unit tests	2026-03-12T13:48:22.9386397Z [EloDaily] {'ok': True, 'date': '2024-01-01', 'fixtures_fetched': 0, 'finished_singles': 0, 'updated': 0, 'duplicates': 0, 'errors': 0, 'dry_run': True, 'skipped_reason': 'ODDS_API_KEY not set'}
+test	Run unit tests	2026-03-12T13:48:22.9387345Z [EloDaily] {'ok': True, 'date': '2024-01-01', 'fixtures_fetched': 1, 'finished_singles': 1, 'updated': 0, 'duplicates': 1, 'errors': 0, 'dry_run': False}
+test	Run unit tests	2026-03-12T13:48:22.9388189Z [EloDaily] {'ok': True, 'date': '2024-01-01', 'fixtures_fetched': 1, 'finished_singles': 1, 'updated': 1, 'duplicates': 0, 'errors': 0, 'dry_run': False}
+test	Run unit tests	2026-03-12T13:48:22.9388866Z [fetch_odds] ODDS_API_KEY missing and MOCK_MODE=false. Returning no live matches.
+test	Run unit tests	2026-03-12T13:48:22.9389256Z [fetch_odds] Fetched 1 upcoming matches.
+test	Run unit tests	2026-03-12T13:48:22.9389519Z [fetch_odds] Fetched 1 upcoming matches.
+test	Run unit tests	2026-03-12T13:48:22.9389780Z Checking results for 1 pending signals...
+test	Run unit tests	2026-03-12T13:48:22.9389965Z 
+test	Run unit tests	2026-03-12T13:48:22.9390048Z Resolved this run : 1 signals
+test	Run unit tests	2026-03-12T13:48:22.9390259Z   WON             : 1
+test	Run unit tests	2026-03-12T13:48:22.9390443Z   LOST            : 0
+test	Run unit tests	2026-03-12T13:48:22.9390619Z   VOID            : 0
+test	Run unit tests	2026-03-12T13:48:22.9390805Z Still pending     : 0 signals
+test	Run unit tests	2026-03-12T13:48:22.9390944Z 
+test	Run unit tests	2026-03-12T13:48:22.9391047Z Checking results for 1 pending signals...
+test	Run unit tests	2026-03-12T13:48:22.9391345Z Error fetching fixtures for resolution: network down
+test	Run unit tests	2026-03-12T13:48:22.9391650Z Checking results for 1 pending signals...
+test	Run unit tests	2026-03-12T13:48:22.9391908Z API did not return success for Fixtures.
+test	Run unit tests	2026-03-12T13:48:22.9392166Z [Scheduler] Running pipeline...
+test	Run unit tests	2026-03-12T13:48:22.9392403Z [Scheduler] No new signals this run.
+test	Run unit tests	2026-03-12T13:48:22.9392771Z [Scheduler] Running pipeline...
+test	Run unit tests	2026-03-12T13:48:22.9393011Z [Scheduler] Odds fetch error: odds down
+test	Run unit tests	2026-03-12T13:48:22.9393311Z [Scheduler] Failed to send to 12345: telegram send failed
+test	Run unit tests	2026-03-12T13:48:22.9393623Z [Scheduler] Running pipeline...
+test	Run unit tests	2026-03-12T13:48:22.9937577Z ##[error]Process completed with exit code 1.

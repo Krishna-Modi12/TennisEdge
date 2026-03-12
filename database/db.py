@@ -33,6 +33,9 @@ class _ConnWrapper:
         cur.executemany(sql, params_list)
         return cur
 
+    def cursor(self, *args, **kwargs):
+        return self._conn.cursor(*args, **kwargs)
+
     def commit(self):
         self._conn.commit()
 
@@ -553,13 +556,17 @@ def resolve_player_name(name: str) -> str:
     canonical = normalize_player_name(name)
     conn = get_conn()
     try:
-        cur = conn.execute(
-            "SELECT canonical_name FROM player_aliases WHERE alias = %s",
-            (canonical,),
-        )
-        r = cur.fetchone()
-        if r:
-            return r[0]
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT canonical_name FROM player_aliases WHERE alias = %s",
+                (canonical,),
+            )
+            r = cur.fetchone()
+            if r:
+                return r[0]
+    except psycopg2.Error as e:
+        conn.rollback()
+        logger.warning(f"[NameResolve] Alias lookup DB error for '{name}': {e}")
     except Exception:
         pass
 
@@ -567,41 +574,46 @@ def resolve_player_name(name: str) -> str:
     variants = get_name_variants(name)
     for v in variants:
         try:
-            # Check if this variant exists in any major table
-            cur = conn.execute(
-                "SELECT player_name FROM player_elo WHERE player_name = %s LIMIT 1",
-                (v,)
-            )
-            if cur.fetchone():
-                # Auto-create alias for future fast lookups
-                if v != canonical:
-                    try:
-                        conn.execute(
-                            "INSERT INTO player_aliases (alias, canonical_name) VALUES (%s, %s) "
-                            "ON CONFLICT (alias) DO NOTHING",
-                            (canonical, v),
-                        )
-                        conn.commit()
-                    except Exception:
-                        conn.rollback()
-                return v
-            
-            cur = conn.execute(
-                "SELECT player_name FROM player_stats WHERE player_name = %s LIMIT 1",
-                (v,)
-            )
-            if cur.fetchone():
-                if v != canonical:
-                    try:
-                        conn.execute(
-                            "INSERT INTO player_aliases (alias, canonical_name) VALUES (%s, %s) "
-                            "ON CONFLICT (alias) DO NOTHING",
-                            (canonical, v),
-                        )
-                        conn.commit()
-                    except Exception:
-                        conn.rollback()
-                return v
+            with conn.cursor() as cur:
+                # Check if this variant exists in any major table
+                cur.execute(
+                    "SELECT player_name FROM player_elo WHERE player_name = %s LIMIT 1",
+                    (v,),
+                )
+                if cur.fetchone():
+                    # Auto-create alias for future fast lookups
+                    if v != canonical:
+                        try:
+                            conn.execute(
+                                "INSERT INTO player_aliases (alias, canonical_name) VALUES (%s, %s) "
+                                "ON CONFLICT (alias) DO NOTHING",
+                                (canonical, v),
+                            )
+                            conn.commit()
+                        except Exception:
+                            conn.rollback()
+                    return v
+                
+                cur.execute(
+                    "SELECT player_name FROM player_stats WHERE player_name = %s LIMIT 1",
+                    (v,),
+                )
+                if cur.fetchone():
+                    if v != canonical:
+                        try:
+                            conn.execute(
+                                "INSERT INTO player_aliases (alias, canonical_name) VALUES (%s, %s) "
+                                "ON CONFLICT (alias) DO NOTHING",
+                                (canonical, v),
+                            )
+                            conn.commit()
+                        except Exception:
+                            conn.rollback()
+                    return v
+        except psycopg2.Error as e:
+            conn.rollback()
+            logger.warning(f"[NameResolve] Variant lookup DB error for '{name}' (variant '{v}'): {e}")
+            continue
         except Exception:
             continue
 
@@ -610,12 +622,13 @@ def resolve_player_name(name: str) -> str:
     if last_name and len(last_name) >= 3:
         try:
             # Search player_elo for names containing this last name
-            cur = conn.execute(
-                "SELECT DISTINCT player_name FROM player_elo "
-                "WHERE player_name ILIKE %s ORDER BY matches_played DESC LIMIT 5",
-                (f"%{last_name}%",),
-            )
-            candidates = [r[0] for r in cur.fetchall()]
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT DISTINCT player_name FROM player_elo "
+                    "WHERE player_name ILIKE %s ORDER BY matches_played DESC LIMIT 5",
+                    (f"%{last_name}%",),
+                )
+                candidates = [r[0] for r in cur.fetchall()]
             if candidates:
                 # If exactly one match, use it
                 if len(candidates) == 1:
@@ -664,6 +677,9 @@ def resolve_player_name(name: str) -> str:
                     except Exception:
                         conn.rollback()
                     return found
+        except psycopg2.Error as e:
+            conn.rollback()
+            logger.warning(f"[NameResolve] Fuzzy search DB error for '{name}': {e}")
         except Exception as e:
             logger.warning(f"[NameResolve] Fuzzy search error for '{name}': {e}")
 

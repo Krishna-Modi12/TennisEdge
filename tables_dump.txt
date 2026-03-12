@@ -1,0 +1,15 @@
+users columns: telegram_id, username
+transactions columns: user_id, credits_added, payment_amount, payment_id, package
+signal_deliveries columns: signal_id, user_id
+signal_results columns: signal_id, actual_winner, is_correct
+player_aliases columns: alias, canonical_name
+player_aliases columns: alias, canonical_name
+player_aliases columns: alias, canonical_name
+player_aliases columns: alias, canonical_name
+player_aliases columns: alias, canonical_name
+player_aliases columns: alias, canonical_name
+player_elo columns: player_name,surface,elo_rating,matches_played
+elo_history columns: event_key, event_date, winner, loser, surface, tournament, source
+signal_results columns: signal_id, actual_winner, is_correct, recorded_at
+signal_results columns: signal_id, actual_winner, is_correct, recorded_at
+unmatched_players columns: name
